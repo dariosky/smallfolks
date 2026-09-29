@@ -1,0 +1,52 @@
+repos:
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.15.13
+    hooks:
+      - id: ruff-check
+        name: backend lint
+        args: ["--fix", "--extend-select", "I,UP"]
+        files: ^backend/
+      - id: ruff-format
+        name: backend format
+        files: ^backend/
+
+  - repo: local
+    hooks:
+      - id: sanitize-locks
+        name: sanitize locks
+        entry: bash -c 'source .venv/bin/activate && python scripts/sanitize_locks.py'
+        language: system
+        pass_filenames: false
+      - id: prettier
+        name: frontend format
+        entry: bash -c 'cd frontend && npm exec -- prettier --write . --log-level warn'
+        language: system
+        files: ^frontend/.*\.(js|jsx|ts|tsx|json|css|html)$
+        pass_filenames: false
+      - id: frontend-lint
+        name: frontend lint
+        entry: bash -c 'cd frontend && npm run lint'
+        language: system
+        files: ^frontend/.*\.(js|jsx|ts|tsx)$
+        pass_filenames: false
+      - id: backend-tests
+        name: backend tests
+        entry: bash -c '.venv/bin/pytest .'
+        language: system
+        files: ^backend/
+        pass_filenames: false
+      - id: frontend-tests
+        name: frontend tests
+        entry: bash -c 'cd frontend && npm test'
+        language: system
+        files: ^frontend/
+        pass_filenames: false
+
+  - repo: https://github.com/PyCQA/bandit
+    rev: "1.9.4"
+    hooks:
+      - id: bandit
+        files: ^backend/
+        name: backend security check
+        args: ["-c", "pyproject.toml", "-r", "backend"]
+        additional_dependencies: ["bandit[toml]"]

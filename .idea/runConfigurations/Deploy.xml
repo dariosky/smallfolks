@@ -1,0 +1,20 @@
+<component name="ProjectRunConfigurationManager">
+  <configuration name="🔥deploy.sh" type="ShConfigurationType" factoryName="Shell Script">
+    <option name="SCRIPT_TEXT" value="" />
+    <option name="INDEPENDENT_SCRIPT_PATH" value="true" />
+    <option name="SCRIPT_PATH" value="$PROJECT_DIR$/scripts/deploy.sh" />
+    <option name="SCRIPT_OPTIONS" value="" />
+    <option name="INDEPENDENT_SCRIPT_WORKING_DIRECTORY" value="true" />
+    <option name="SCRIPT_WORKING_DIRECTORY" value="$PROJECT_DIR$" />
+    <option name="INDEPENDENT_INTERPRETER_PATH" value="true" />
+    <option name="INTERPRETER_PATH" value="/bin/zsh" />
+    <option name="INTERPRETER_OPTIONS" value="" />
+    <option name="EXECUTE_IN_TERMINAL" value="true" />
+    <option name="EXECUTE_SCRIPT_FILE" value="true" />
+    <envs>
+      <env name="LOCAL_ENV_FILE" value="backend/.env.opal" />
+      <env name="INSTALL_CRON_WATCH" value="true" />
+    </envs>
+    <method v="2" />
+  </configuration>
+</component>

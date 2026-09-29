@@ -1,0 +1,25 @@
+FOOTPRINTS = {
+    "home": (78, 74),
+    "bakery": (116, 86),
+    "shop": (116, 86),
+    "workplace": (116, 86),
+    "park": (142, 104),
+}
+
+
+def validate_place_layout(places: list[dict]) -> None:
+    """Reject generated town layouts whose usable place footprints overlap."""
+    for index, place in enumerate(places):
+        width, height = FOOTPRINTS[place["kind"]]
+        left = place["position"]["x"] - width / 2
+        top = place["position"]["y"] - height / 2
+        right = left + width
+        bottom = top + height
+        for other in places[index + 1 :]:
+            other_width, other_height = FOOTPRINTS[other["kind"]]
+            other_left = other["position"]["x"] - other_width / 2
+            other_top = other["position"]["y"] - other_height / 2
+            other_right = other_left + other_width
+            other_bottom = other_top + other_height
+            if left < other_right and right > other_left and top < other_bottom and bottom > other_top:
+                raise ValueError(f"Place footprints overlap: {place['id']} and {other['id']}")

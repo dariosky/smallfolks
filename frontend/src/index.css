@@ -1,0 +1,982 @@
+@import "./common.css";
+
+.town-shell {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 2rem;
+}
+.town-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: end;
+  margin-bottom: 1.5rem;
+}
+.town-header h1 {
+  font-family: Georgia, serif;
+  font-size: clamp(3rem, 7vw, 5.5rem);
+  line-height: 0.8;
+  margin: 0;
+  letter-spacing: -0.07em;
+}
+.town-header p {
+  color: var(--muted);
+  margin: 0.8rem 0 0;
+}
+.clock {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  padding: 0.8rem 1rem;
+  text-align: right;
+  box-shadow: var(--shadow);
+}
+.clock span {
+  display: block;
+  font-weight: 800;
+  font-size: 1.15rem;
+}
+.clock small {
+  color: var(--muted);
+}
+.town-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 310px;
+  gap: 1rem;
+}
+.map-card,
+.inspector {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow);
+  overflow: hidden;
+}
+.town-map {
+  display: block;
+  width: 100%;
+  min-height: 650px;
+  background: #d8e7bc;
+}
+.map-ground {
+  fill: #d8e7bc;
+}
+.sun-glow {
+  fill: #ffe4a0;
+  opacity: 0.75;
+}
+.road {
+  fill: none;
+  stroke: #c8b399;
+  stroke-width: 30;
+  stroke-linecap: round;
+}
+.path {
+  fill: none;
+  stroke: #f8f2de;
+  stroke-width: 8;
+  stroke-linecap: round;
+  stroke-dasharray: 2 8;
+}
+.place {
+  cursor: pointer;
+}
+.place rect {
+  fill: #f7ebd3;
+  stroke: #8e6d55;
+  stroke-width: 2;
+}
+.place-home rect {
+  fill: #d8a26f;
+}
+.place-bakery rect {
+  fill: #e88f7f;
+}
+.place-shop rect {
+  fill: #e3c95e;
+}
+.place-workplace rect {
+  fill: #9fc8ba;
+}
+.place-park rect {
+  fill: #9bc875;
+  stroke: #669b5a;
+}
+.place-park circle {
+  fill: #4f8f59;
+}
+.place text {
+  font: 700 10px system-ui;
+  fill: #45372e;
+  text-anchor: middle;
+  pointer-events: none;
+}
+.map-entity {
+  cursor: pointer;
+}
+.map-entity circle {
+  fill: #494f77;
+  stroke: #fffaf0;
+  stroke-width: 3;
+}
+.map-entity.vehicle rect {
+  fill: #e67868;
+  stroke: #fffaf0;
+  stroke-width: 2;
+}
+.map-entity.pet circle {
+  fill: #6f4f39;
+}
+.map-entity.is-selected circle,
+.map-entity.is-selected rect {
+  stroke: #263e63;
+  stroke-width: 4;
+}
+.map-entity text {
+  font: 700 10px system-ui;
+  fill: #342d29;
+  text-anchor: middle;
+  pointer-events: none;
+}
+.map-note {
+  font: 600 11px system-ui;
+  fill: #5b7650;
+}
+.river {
+  fill: none;
+  stroke: #a8d7e2;
+  stroke-width: 25;
+  opacity: 0.8;
+}
+.fields path {
+  fill: #c7d991;
+  stroke: #afc276;
+  stroke-width: 2;
+  stroke-dasharray: 5 4;
+}
+.road {
+  stroke: #6e7274;
+  stroke-width: 34;
+}
+.road-marking {
+  fill: none;
+  stroke: #f9e8a4;
+  stroke-width: 2;
+  stroke-dasharray: 12 10;
+}
+.path {
+  stroke: url(#paving);
+  stroke-width: 13;
+  stroke-dasharray: none;
+}
+.crosswalk path {
+  fill: none;
+  stroke: #fff9ea;
+  stroke-width: 4;
+}
+.active-route {
+  fill: none;
+  stroke: #f8f3c3;
+  stroke-width: 4;
+  stroke-dasharray: 7 5;
+  opacity: 0.95;
+  animation: route-march 0.8s linear infinite;
+}
+.rail-bed {
+  fill: none;
+  stroke: #4c5560;
+  stroke-width: 15;
+  stroke-linejoin: round;
+}
+.rail-ties {
+  fill: none;
+  stroke: #c6a87f;
+  stroke-width: 11;
+  stroke-dasharray: 3 7;
+  stroke-linejoin: round;
+}
+.rail-line {
+  fill: none;
+  stroke: #dfe4e5;
+  stroke-width: 3;
+  stroke-dasharray: 4 4;
+  stroke-linejoin: round;
+}
+.station rect {
+  fill: #f5e5be;
+  stroke: #806750;
+  stroke-width: 1.5;
+}
+.station text {
+  font: 800 8px system-ui;
+  fill: #5d625c;
+  text-anchor: middle;
+  letter-spacing: 0.6px;
+}
+.train-locomotive {
+  fill: #cf5149;
+  stroke: #702f35;
+  stroke-width: 2;
+}
+.train-coach {
+  fill: #f1d9a1;
+  stroke: #705044;
+  stroke-width: 2;
+}
+.train-coupler {
+  fill: none;
+  stroke: #293640;
+  stroke-width: 3;
+}
+.train-roof-kit {
+  fill: #a5b2ae;
+  stroke: #55635f;
+  stroke-width: 1;
+}
+.train-windows {
+  fill: none;
+  stroke: #6e9ba4;
+  stroke-width: 4;
+}
+.train-bogies {
+  fill: none;
+  stroke: #293640;
+  stroke-width: 5;
+  stroke-linecap: round;
+}
+.train-passenger {
+  fill: #354a6b;
+  stroke: #fff7e2;
+  stroke-width: 1.5;
+}
+.train-passenger-count {
+  font: 800 9px system-ui;
+  fill: #384d4a;
+  text-anchor: middle;
+  paint-order: stroke;
+  stroke: #fff7e2;
+  stroke-width: 3;
+}
+.place .building-shadow {
+  fill: #43505a;
+  opacity: 0.25;
+  transform: translate(5px, 5px);
+}
+.place .building-wall {
+  fill: #efc997;
+  stroke: #75564a;
+  stroke-width: 2;
+}
+.place-home .building-wall {
+  fill: #f1d1ab;
+}
+.place-bakery .building-wall {
+  fill: #f6b99c;
+}
+.place-shop .building-wall {
+  fill: #f1d682;
+}
+.place-workplace .building-wall {
+  fill: #b3d3ce;
+}
+.place .building-roof {
+  fill: #b55d54;
+  stroke: #75423e;
+  stroke-width: 2;
+}
+.place-workplace .building-roof {
+  fill: #647e91;
+}
+.place-shop .building-roof {
+  fill: #d68449;
+}
+.place .building-door {
+  fill: #70514a;
+}
+.place .window {
+  fill: #a9d3dd;
+  stroke: #6a8d9a;
+  stroke-width: 1;
+}
+.place .awning {
+  fill: #f7f0d6;
+  stroke: #d16e63;
+  stroke-width: 3;
+  stroke-dasharray: 9 4;
+}
+.place .shop-sign {
+  font: 800 8px system-ui;
+  fill: #6f4d33;
+  text-anchor: middle;
+}
+.place .place-name {
+  font: 800 10px system-ui;
+  fill: #46504b;
+  text-anchor: middle;
+  paint-order: stroke;
+  stroke: #fff9e9;
+  stroke-width: 3;
+}
+.place .park-lawn {
+  fill: #9dcf7f;
+  stroke: #629d61;
+  stroke-width: 2;
+}
+.home-roof .home-parcel {
+  fill: #b8d58d;
+  stroke: #789c64;
+  stroke-width: 1.5;
+}
+.home-roof .garden-path {
+  fill: none;
+  stroke: #e6cfa8;
+  stroke-width: 7;
+}
+.home-roof .garden-fence {
+  fill: none;
+  stroke: #c9b18b;
+  stroke-width: 2;
+  stroke-dasharray: 2 3;
+}
+.home-roof .roof-shadow {
+  fill: #4c4b47;
+  opacity: 0.25;
+  transform: translate(4px, 4px);
+}
+.home-roof .roof-plane {
+  fill: #ad6253;
+  stroke: #67413b;
+  stroke-width: 2;
+}
+.home-roof-1 .roof-plane {
+  fill: #6b7f8d;
+}
+.home-roof-2 .roof-plane {
+  fill: #ad784c;
+}
+.home-roof .roof-ridge {
+  stroke: #f1be8a;
+  stroke-width: 2.2;
+}
+.home-roof .roof-tiles {
+  fill: none;
+  stroke: #7f463e;
+  stroke-width: 0.7;
+  opacity: 0.85;
+}
+.home-roof-1 .roof-tiles {
+  stroke: #475d6c;
+}
+.home-roof-2 .roof-tiles {
+  stroke: #835333;
+}
+.home-roof .chimney {
+  fill: #d0b091;
+  stroke: #72564a;
+  stroke-width: 1;
+}
+.home-roof .skylight {
+  fill: #8ebdc7;
+  stroke: #d9edf0;
+  stroke-width: 1.5;
+}
+.home-roof .garden-tree {
+  fill: #4f8f58;
+  stroke: #356a40;
+  stroke-width: 1.5;
+}
+.home-roof .garden-shed {
+  fill: #9e724e;
+  stroke: #69452f;
+  stroke-width: 1;
+}
+.civic-roof .civic-parcel {
+  fill: #d4d7b1;
+  stroke: #a8aa83;
+  stroke-width: 1.5;
+}
+.civic-roof .civic-walk {
+  fill: none;
+  stroke: #e6d5b6;
+  stroke-width: 9;
+}
+.civic-roof .civic-shadow {
+  fill: #3d4444;
+  opacity: 0.24;
+  transform: translate(5px, 5px);
+}
+.civic-roof .civic-plane {
+  fill: #b86b58;
+  stroke: #6a4740;
+  stroke-width: 2;
+}
+.civic-roof-workplace .civic-plane {
+  fill: #698194;
+}
+.civic-roof-shop .civic-plane {
+  fill: #c98548;
+}
+.civic-roof .civic-ridge {
+  stroke: #e9c48b;
+  stroke-width: 2.5;
+}
+.civic-roof .civic-tiles {
+  fill: none;
+  stroke: #7f4b40;
+  stroke-width: 0.75;
+  opacity: 0.9;
+}
+.civic-roof-workplace .civic-tiles {
+  stroke: #485e70;
+}
+.civic-roof-shop .civic-tiles {
+  stroke: #875734;
+}
+.civic-roof .civic-skylight {
+  fill: #8cc6d2;
+  stroke: #e3f3f3;
+  stroke-width: 1.5;
+}
+.civic-roof .civic-unit {
+  fill: #aeb4aa;
+  stroke: #646d68;
+  stroke-width: 1.2;
+}
+.civic-roof .bakery-vent {
+  fill: #d9c4a7;
+  stroke: #7a604e;
+  stroke-width: 1.5;
+}
+.civic-roof .bakery-vent-line {
+  stroke: #705a4b;
+  stroke-width: 3;
+}
+.civic-roof .shop-canopy {
+  fill: #f3e2ba;
+  stroke: #aa5c4e;
+  stroke-width: 1.5;
+}
+.civic-roof .shop-stripes {
+  stroke: #c06754;
+  stroke-width: 3;
+}
+.place .park-path {
+  fill: none;
+  stroke: #e7d4ae;
+  stroke-width: 7;
+}
+.trees rect {
+  fill: #806144;
+}
+.trees circle {
+  fill: #497f55;
+  stroke: #35623e;
+  stroke-width: 1;
+}
+.trees circle + circle {
+  fill: #5e9c62;
+}
+.map-labels text {
+  font: 800 9px system-ui;
+  fill: #78916a;
+  letter-spacing: 1.3px;
+}
+.map-entity {
+  cursor: pointer;
+  transition: transform 1.2s ease-in-out;
+}
+.entity-shadow {
+  fill: #425746;
+  opacity: 0.2;
+}
+.person-head {
+  fill: #e6a77f;
+  stroke: #754c3e;
+  stroke-width: 1;
+}
+.person-hair {
+  fill: #4a342d;
+}
+.person-torso {
+  fill: #466c9b;
+  stroke: #2d4f78;
+  stroke-width: 1;
+}
+.person-arm,
+.person-legs {
+  fill: none;
+  stroke: #24394e;
+  stroke-width: 3;
+  stroke-linecap: round;
+}
+.map-entity:nth-of-type(3n) .person-torso {
+  fill: #c7655b;
+  stroke: #923f3d;
+}
+.map-entity:nth-of-type(4n) .person-torso {
+  fill: #7e9b58;
+  stroke: #55713b;
+}
+.map-entity:nth-of-type(5n) .person-torso {
+  fill: #846493;
+  stroke: #5c436b;
+}
+.pet-body {
+  fill: #ad7549;
+  stroke: #67422d;
+  stroke-width: 1.5;
+}
+.vehicle-body rect {
+  fill: #d66c5c;
+  stroke: #7d3d38;
+  stroke-width: 1.5;
+}
+.vehicle-body path {
+  fill: #b8dce2;
+  stroke: #5b7c82;
+  stroke-width: 1.2;
+}
+.vehicle-body circle {
+  fill: #37434b;
+  stroke: #f4e9d9;
+  stroke-width: 1;
+}
+.map-entity.is-selected .person-head,
+.map-entity.is-selected .person-torso,
+.map-entity.is-selected .vehicle-body rect,
+.map-entity.is-selected .pet-body {
+  stroke: #203f6a;
+  stroke-width: 3;
+}
+.entity-label {
+  font: 800 10px system-ui;
+  fill: #293d4e;
+  text-anchor: middle;
+  paint-order: stroke;
+  stroke: #fff9e9;
+  stroke-width: 4;
+}
+.person .person-body {
+  animation: person-idle 2.4s ease-in-out infinite alternate;
+  transform-origin: center;
+}
+.is-walking .person-body {
+  animation: person-bob 0.42s ease-in-out infinite alternate;
+}
+.is-walking .person-legs {
+  animation: person-steps 0.42s linear infinite alternate;
+}
+.pet .pet-body {
+  animation: dog-bob 1s ease-in-out infinite alternate;
+}
+.is-eating .person-arm {
+  animation: breakfast-bite 1.1s ease-in-out infinite alternate;
+}
+.breakfast-plate {
+  fill: #f6f0dc;
+  stroke: #70879d;
+  stroke-width: 1;
+}
+.breakfast-spoon {
+  fill: none;
+  stroke: #bdc2c3;
+  stroke-width: 2;
+  stroke-linecap: round;
+}
+@keyframes person-idle {
+  to {
+    transform: translateY(-1.5px);
+  }
+}
+@keyframes person-bob {
+  to {
+    transform: translateY(-2px);
+  }
+}
+@keyframes person-steps {
+  to {
+    stroke-dasharray: 5 2;
+  }
+}
+@keyframes dog-bob {
+  to {
+    transform: translateX(2px) translateY(-1px);
+  }
+}
+@keyframes breakfast-bite {
+  to {
+    transform: translate(2px, -3px);
+  }
+}
+@keyframes route-march {
+  to {
+    stroke-dashoffset: -12;
+  }
+}
+.time-controls {
+  padding: 1rem;
+  display: flex;
+  gap: 0.6rem;
+}
+.secondary-button.is-running {
+  background: #254c48;
+  color: white;
+}
+.inspector {
+  padding: 1.35rem;
+}
+.inspector h2 {
+  margin: 0.1rem 0 0.3rem;
+  font-family: Georgia, serif;
+  font-size: 2rem;
+}
+.activity {
+  font-weight: 750;
+  color: var(--accent-strong);
+}
+.why {
+  line-height: 1.5;
+  color: var(--muted);
+}
+.why strong {
+  color: var(--ink);
+  display: block;
+}
+.needs {
+  margin-top: 1.2rem;
+  display: grid;
+  gap: 0.55rem;
+}
+.needs > div {
+  display: grid;
+  grid-template-columns: 58px 1fr 28px;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.8rem;
+}
+.needs i {
+  height: 7px;
+  background: #e6ded0;
+  border-radius: 20px;
+  overflow: hidden;
+}
+.needs b {
+  display: block;
+  height: 100%;
+  background: var(--accent);
+  border-radius: inherit;
+}
+.needs em {
+  font-style: normal;
+  color: var(--muted);
+}
+.event-feed {
+  border-top: 1px solid var(--line);
+  margin-top: 1.5rem;
+  padding-top: 1rem;
+}
+.event-feed p {
+  font-size: 0.82rem;
+  line-height: 1.35;
+}
+.event-feed time {
+  color: var(--accent-strong);
+  font-weight: 800;
+  display: inline-block;
+  min-width: 3.4rem;
+}
+.map-loading {
+  display: grid;
+  place-items: center;
+  min-height: 510px;
+  color: var(--muted);
+}
+.error-state {
+  background: #ffe5df;
+  color: #8d3022;
+  padding: 1rem;
+  border-radius: var(--radius-sm);
+}
+@media (max-width: 850px) {
+  .town-shell {
+    padding: 1rem;
+  }
+  .town-header {
+    align-items: start;
+    gap: 1rem;
+    flex-direction: column;
+  }
+  .town-layout {
+    grid-template-columns: 1fr;
+  }
+  .town-map {
+    min-height: 360px;
+  }
+  .time-controls {
+    flex-wrap: wrap;
+  }
+}
+
+#root {
+  min-height: 100vh;
+}
+
+.page-shell,
+.dashboard-shell {
+  min-height: 100vh;
+  padding: 3rem 1.25rem;
+}
+
+.page-shell {
+  display: grid;
+  gap: 1.5rem;
+  align-items: center;
+  max-width: 1180px;
+  margin: 0 auto;
+}
+
+.hero-copy,
+.auth-card,
+.panel,
+.dashboard-header {
+  background: var(--card);
+  border: 1px solid var(--line);
+  box-shadow: var(--shadow);
+  backdrop-filter: blur(12px);
+}
+
+.hero-copy {
+  padding: 2rem;
+  border-radius: var(--radius-lg);
+}
+
+.hero-copy h1 {
+  margin: 0;
+  font-size: clamp(2.8rem, 7vw, 5.4rem);
+  line-height: 0.95;
+}
+
+.hero-description {
+  max-width: 34rem;
+  margin: 1.25rem 0 0;
+  color: var(--muted);
+  font-size: 1.1rem;
+}
+
+.hero-points {
+  margin: 1.5rem 0 0;
+  padding-left: 1.25rem;
+  color: var(--muted);
+  display: grid;
+  gap: 0.55rem;
+}
+
+.auth-card {
+  border-radius: var(--radius-lg);
+  padding: 1.25rem;
+}
+
+.auth-switcher {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+
+.auth-switcher button {
+  padding: 0.85rem 1rem;
+  border-color: var(--line);
+  background: rgba(255, 255, 255, 0.45);
+  font-weight: 700;
+}
+
+.auth-switcher button.is-active {
+  background: var(--accent);
+  color: white;
+}
+
+.auth-form {
+  margin-top: 1rem;
+  display: grid;
+  gap: 0.95rem;
+}
+
+.google-auth-button {
+  width: 100%;
+  margin-top: 1rem;
+  justify-content: center;
+  gap: 0.6rem;
+  background: #fff;
+  color: var(--ink);
+  border-color: var(--line);
+}
+
+.google-auth-button__mark {
+  display: grid;
+  place-items: center;
+  width: 1.3rem;
+  height: 1.3rem;
+  border-radius: 50%;
+  background: #f1f3f4;
+  color: #1a73e8;
+  font-weight: 800;
+}
+
+.auth-form label {
+  display: grid;
+  gap: 0.45rem;
+  font-weight: 600;
+}
+
+.auth-form input {
+  width: 100%;
+  padding: 0.85rem 1rem;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.72);
+}
+
+.auth-inline-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.auth-inline-actions button {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--accent-strong);
+  font-weight: 700;
+}
+
+.form-error,
+.form-success {
+  margin: 0;
+  font-size: 0.92rem;
+  line-height: 1.45;
+}
+
+.form-error {
+  color: #b42318;
+}
+
+.form-success {
+  color: #027a48;
+}
+
+.auth-status-page {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 1.25rem;
+}
+
+.password-field {
+  position: relative;
+  display: block;
+}
+
+.password-field input {
+  padding-right: 3rem;
+}
+
+.password-toggle-button {
+  position: absolute;
+  top: 50%;
+  right: 0.45rem;
+  transform: translateY(-50%);
+  width: 2.25rem;
+  height: 2.25rem;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--muted);
+}
+
+.password-toggle-button:hover,
+.password-toggle-button:focus-visible {
+  background: rgba(30, 125, 100, 0.08);
+  color: var(--accent-strong);
+}
+
+.password-toggle-button:disabled {
+  opacity: 0.5;
+}
+
+.password-toggle-icon {
+  width: 1.25rem;
+  height: 1.25rem;
+  pointer-events: none;
+}
+
+.dashboard-shell {
+  max-width: 1180px;
+  margin: 0 auto;
+}
+
+.dashboard-header {
+  border-radius: var(--radius-lg);
+  padding: 1.5rem;
+  display: grid;
+  gap: 1rem;
+  align-items: center;
+}
+
+.avatar-chip {
+  width: 3.5rem;
+  height: 3.5rem;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--accent);
+  color: white;
+  font-weight: 800;
+  font-size: 1.1rem;
+}
+
+.subtle-text {
+  margin: 0.3rem 0 0;
+  color: var(--muted);
+}
+
+.dashboard-grid {
+  margin-top: 1.5rem;
+  display: grid;
+  gap: 1rem;
+}
+
+.panel {
+  border-radius: var(--radius-md);
+  padding: 1.5rem;
+}
+
+.panel h2 {
+  margin: 0;
+}
+
+.panel p {
+  color: var(--muted);
+  line-height: 1.6;
+}
+
+code {
+  padding: 0.12rem 0.35rem;
+  border-radius: 999px;
+  background: rgba(17, 24, 39, 0.08);
+}
+
+@media (min-width: 900px) {
+  .page-shell {
+    grid-template-columns: minmax(0, 1.1fr) minmax(24rem, 26rem);
+  }
+
+  .dashboard-header {
+    grid-template-columns: auto 1fr auto;
+  }
+
+  .dashboard-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
