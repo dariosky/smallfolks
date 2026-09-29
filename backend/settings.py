@@ -30,7 +30,7 @@ BASE_URL = os.getenv("BASE_URL", "http://127.0.0.1:5341")
 API_PREFIX = os.getenv("API_PREFIX", "/api")
 API_URL = os.getenv("API_URL", f"{BASE_URL}{API_PREFIX}")
 CORS_ORIGINS = os.getenv("CORS_ORIGINS", BASE_URL)
-SITE_NAME = os.getenv("SITE_NAME", "Smallfolk")
+SITE_NAME = os.getenv("SITE_NAME", "SmallFolks")
 SESSION_MAX_AGE_SECONDS = int(
     os.getenv("SESSION_MAX_AGE_SECONDS", str(60 * 60 * 24 * 30))
 )

@@ -5,7 +5,7 @@ export function LandingPage() {
     <main className="page-shell">
       <section className="hero-copy">
         <p className="eyebrow">Starter app</p>
-        <h1>Smallfolk</h1>
+        <h1>SmallFolks</h1>
         <p className="hero-description">A calm, inspectable city-life simulation.</p>
         <ul className="hero-points">
           <li>FastAPI app factory with SQLModel and Alembic</li>

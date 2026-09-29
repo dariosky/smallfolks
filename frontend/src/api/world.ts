@@ -5,6 +5,23 @@ const API_PREFIX =
 
 export type Position = { x: number; y: number };
 export type Place = { id: string; name: string; kind: string; position: Position };
+export type Household = {
+  id: string;
+  home_place_id: string;
+  member_ids: string[];
+  food_servings: number;
+};
+export type Train = {
+  id: string;
+  name: string;
+  stops: string[];
+  state?: {
+    distance: number;
+    at_station: string | null;
+    passenger_ids: string[];
+    carriages: { id: string; passenger_ids: string[] }[];
+  };
+};
 export type RenderEntity = {
   id: string;
   kind: "person" | "pet" | "vehicle";
@@ -19,13 +36,21 @@ export type World = {
   clock: string;
   generation_version: string;
   simulation_version: string;
+  revision: number;
+  simulation: {
+    elapsed_seconds: number;
+    presentation_time_seconds: number;
+    running: boolean;
+    speed: number;
+  };
   places: Place[];
+  households: Household[];
   roads: { id: string; points: number[][] }[];
   paths: { id: string; points: number[][] }[];
   people: Entity[];
   pets: Entity[];
   vehicles: Entity[];
-  trains?: { id: string; name: string; stops: string[] }[];
+  trains?: Train[];
   events: { at: string; summary: string }[];
 };
 export type Entity = {
@@ -33,16 +58,26 @@ export type Entity = {
   kind: string;
   name: string;
   position: Position;
+  palette?: string;
   activity?: string;
   state?: string;
   target_place_id?: string;
   explanation?: string;
   next_commitment?: string;
   needs?: Record<string, number>;
+  walk_status?: string;
+  accident_at_home?: boolean;
+  social_inclination?: number;
+  cinema_inclination?: number;
+  household_id?: string;
+  carrying_groceries?: boolean;
   role?: string;
   route?: Position[];
   train_departure_id?: string;
   train_arrival_id?: string;
+  on_train?: boolean;
+  train_car_index?: number;
+  train_seat_index?: number;
 };
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
@@ -63,9 +98,25 @@ export function createWorld(seed = 7341) {
   });
 }
 
-export function advanceWorld(worldId: string, minutes: number) {
+export function advanceWorld(worldId: string, minutes: number, expectedRevision?: number) {
   return request<World>(`/worlds/${worldId}/advance`, {
     method: "POST",
-    body: JSON.stringify({ minutes }),
+    body: JSON.stringify({ minutes, expected_revision: expectedRevision }),
+  });
+}
+
+export function getWorld(worldId: string) {
+  return request<World>(`/worlds/${worldId}`);
+}
+
+export function setWorldRunning(
+  worldId: string,
+  running: boolean,
+  speed: number,
+  expectedRevision: number,
+) {
+  return request<World>(`/worlds/${worldId}/run`, {
+    method: "POST",
+    body: JSON.stringify({ running, speed, expected_revision: expectedRevision }),
   });
 }

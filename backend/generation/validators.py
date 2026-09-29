@@ -2,6 +2,7 @@ FOOTPRINTS = {
     "home": (78, 74),
     "bakery": (116, 86),
     "shop": (116, 86),
+    "bar": (116, 86),
     "workplace": (116, 86),
     "park": (142, 104),
 }

@@ -1,5 +1,13 @@
 import { useEffect, useState } from "react";
-import { advanceWorld, createWorld, type Entity, type Place, type World } from "../api/world";
+import {
+  advanceWorld,
+  createWorld,
+  getWorld,
+  setWorldRunning,
+  type Entity,
+  type Place,
+  type World,
+} from "../api/world";
 import { TownMap } from "../world/TownMap";
 
 type Selection = Entity | Place;
@@ -19,33 +27,81 @@ function displayTime(clock: string) {
 export function TownPage() {
   const [world, setWorld] = useState<World | null>(null);
   const [selected, setSelected] = useState<Selection | null>(null);
-  const [running, setRunning] = useState(true);
+  const [worldId, setWorldId] = useState<string | null>(null);
   const [error, setError] = useState("");
 
   useEffect(() => {
     void createWorld()
       .then((next) => {
         setWorld(next);
+        setWorldId(next.id);
         setSelected(next.people[0]);
+        return resumeWorld(next);
       })
+      .then(setWorld)
       .catch((reason: unknown) => {
         const detail = reason instanceof Error ? reason.message : "Request failed.";
         setError(`Cannot reach the town backend at http://127.0.0.1:5340. ${detail}`);
       });
   }, []);
   useEffect(() => {
-    if (!running || !world) return undefined;
+    if (!worldId) return undefined;
     const timer = window.setInterval(() => {
-      void advanceWorld(world.id, 1)
+      void getWorld(worldId)
         .then(setWorld)
-        .catch(() => setRunning(false));
-    }, 1300);
+        .catch(() => setError("Lost connection to the town backend."));
+    }, 250);
     return () => window.clearInterval(timer);
-  }, [running, world]);
+  }, [worldId]);
 
   async function advance(minutes: number) {
     if (!world) return;
-    setWorld(await advanceWorld(world.id, minutes));
+    try {
+      // The server's live clock can advance between polling and a click. Manual
+      // time travel is deliberately serialized server-side rather than rejected
+      // for a harmless stale display revision.
+      setWorld(await advanceWorld(world.id, minutes));
+      setError("");
+    } catch (reason: unknown) {
+      const detail = reason instanceof Error ? reason.message : "Request failed.";
+      setError(`Cannot advance the town clock. ${detail}`);
+    }
+  }
+
+  async function toggleRunning() {
+    if (!world) return;
+    try {
+      setWorld(
+        await setWorldRunning(
+          world.id,
+          !world.simulation.running,
+          world.simulation.speed,
+          world.revision,
+        ),
+      );
+    } catch {
+      setWorld(await getWorld(world.id));
+    }
+  }
+
+  async function resumeWorld(worldToResume: World): Promise<World> {
+    try {
+      return await setWorldRunning(
+        worldToResume.id,
+        true,
+        worldToResume.simulation.speed,
+        worldToResume.revision,
+      );
+    } catch {
+      const current = await getWorld(worldToResume.id);
+      if (current.simulation.running) return current;
+      return setWorldRunning(
+        current.id,
+        true,
+        current.simulation.speed,
+        current.revision,
+      );
+    }
   }
 
   const currentSelection =
@@ -55,19 +111,27 @@ export function TownPage() {
         ) ?? selected)
       : selected;
   const selectedEntity = currentSelection && isEntity(currentSelection) ? currentSelection : null;
+  const selectedPlace = currentSelection && !isEntity(currentSelection) ? currentSelection : null;
+  const selectedHousehold =
+    selectedEntity?.household_id && world
+      ? world.households.find((household) => household.id === selectedEntity.household_id)
+      : undefined;
+  const selectedHomeHousehold =
+    selectedPlace?.kind === "home" && world
+      ? world.households.find((household) => household.home_place_id === selectedPlace.id)
+      : undefined;
+  const selectedHomeMembers = selectedHomeHousehold
+    ? world?.people.filter((person) => selectedHomeHousehold.member_ids.includes(person.id)) ?? []
+    : [];
   return (
     <main className="town-shell">
       <header className="town-header">
         <div>
-          <p className="eyebrow">Fixed-seed proof of concept</p>
-          <h1>Smallfolk</h1>
+          <h1>SmallFolks</h1>
           <p>A connected town with lives in motion.</p>
         </div>
         <div className="clock">
           <span>{world ? displayTime(world.clock) : "Loading town…"}</span>
-          <small>
-            seed {world?.seed ?? "—"} · {world?.generation_version ?? "—"}
-          </small>
         </div>
       </header>
       {error ? <p className="error-state">{error}</p> : null}
@@ -76,7 +140,6 @@ export function TownPage() {
           {world ? (
             <TownMap
               onSelect={setSelected}
-              running={running}
               selectedId={currentSelection?.id ?? null}
               world={world}
             />
@@ -101,12 +164,12 @@ export function TownPage() {
               +1 hour
             </button>
             <button
-              className={running ? "secondary-button is-running" : "secondary-button"}
+              className={world?.simulation.running ? "secondary-button is-running" : "secondary-button"}
               disabled={!world}
-              onClick={() => setRunning(!running)}
+              onClick={() => void toggleRunning()}
               type="button"
             >
-              {running ? "Pause" : "Resume"}
+              {world?.simulation.running ? "Pause" : "Resume"}
             </button>
           </div>
         </div>
@@ -135,7 +198,7 @@ export function TownPage() {
                     <div className="needs">
                       {Object.entries(selectedEntity.needs).map(([name, value]) => (
                         <div key={name}>
-                          <span>{name}</span>
+                          <span>{name === "walk_out" ? "needs walk" : name}</span>
                           <i>
                             <b style={{ width: `${value}%` }} />
                           </i>
@@ -144,12 +207,58 @@ export function TownPage() {
                       ))}
                     </div>
                   ) : null}
+                  {selectedEntity.walk_status ? (
+                    <p>
+                      <strong>Walk:</strong> {selectedEntity.walk_status}
+                      {selectedEntity.accident_at_home ? " — cleanup needed" : ""}
+                    </p>
+                  ) : null}
+                  {selectedHousehold ? (
+                    <p>
+                      <strong>Household food:</strong>{" "}
+                      {selectedHousehold.food_servings} servings for {selectedHousehold.member_ids.length}{" "}
+                      people ({selectedHousehold.food_servings / selectedHousehold.member_ids.length} days)
+                    </p>
+                  ) : null}
+                  {selectedEntity.social_inclination !== undefined ? (
+                    <p>
+                      <strong>Social inclination:</strong>{" "}
+                      {Math.round(selectedEntity.social_inclination * 100)}%
+                    </p>
+                  ) : null}
+                  {selectedEntity.cinema_inclination !== undefined ? (
+                    <p>
+                      <strong>Cinema inclination:</strong>{" "}
+                      {Math.round(selectedEntity.cinema_inclination * 100)}%
+                    </p>
+                  ) : null}
                 </>
               ) : (
-                <p className="why">
-                  A semantic place: {labelsFor(currentSelection.kind)}. Click a resident to inspect
-                  their activity and decision trace.
-                </p>
+                <>
+                  <p className="why">
+                    A semantic place: {labelsFor(currentSelection.kind)}.
+                  </p>
+                  {selectedPlace?.kind === "home" ? (
+                    selectedHomeHousehold ? (
+                      <section className="household-members">
+                        <p className="eyebrow">Household</p>
+                        <p>{selectedHomeMembers.length} residents live here</p>
+                        <ul>
+                          {selectedHomeMembers.map((member) => (
+                            <li key={member.id}>
+                              <button onClick={() => setSelected(member)} type="button">
+                                <span>{member.name}</span>
+                                <small>{member.role}</small>
+                              </button>
+                            </li>
+                          ))}
+                        </ul>
+                      </section>
+                    ) : (
+                      <p className="why">This home is currently unoccupied.</p>
+                    )
+                  ) : null}
+                </>
               )}
             </>
           ) : (
@@ -180,6 +289,7 @@ function labelsFor(kind: string) {
       home: "Home",
       bakery: "Bakery",
       shop: "Market",
+      bar: "Bar",
       workplace: "Workplace",
       park: "Public park",
       vehicle: "Vehicle",

@@ -1,0 +1,656 @@
+/* The town is drawn as an illustrated paper map. */
+.town-shell {
+  max-width: 1640px;
+  padding: clamp(1rem, 2.4vw, 2.6rem);
+}
+.town-header {
+  margin-bottom: 1.3rem;
+  align-items: center;
+}
+.town-header h1 {
+  color: #304448;
+  font-family: Georgia, serif;
+  font-weight: 900;
+  text-shadow:
+    2px 3px 0 #f7ca8e,
+    4px 5px 0 #e78f7b;
+}
+.town-header p {
+  color: #58675e;
+  font-weight: 650;
+}
+.town-layout {
+  grid-template-columns: minmax(0, 1fr) minmax(300px, 335px);
+  gap: 1.3rem;
+  align-items: start;
+}
+.map-card,
+.inspector,
+.clock {
+  background: #fffaf0;
+  border: 2px solid #4b5a50;
+  box-shadow:
+    5px 6px 0 #b3bdae,
+    9px 10px 0 rgba(53, 71, 62, 0.12);
+}
+.map-card {
+  border-radius: 18px 21px 15px 19px;
+}
+.inspector {
+  border-radius: 18px 20px 16px 22px;
+}
+.clock {
+  border-radius: 16px 19px 14px 20px;
+  transform: rotate(1deg);
+}
+.town-map {
+  width: 100%;
+  min-height: 0;
+  aspect-ratio: 5/3;
+  background: #cce6ae;
+  border-bottom: 2px solid #4b5a50;
+  overflow: hidden;
+}
+.town-map .map-ground {
+  fill: #cce6ae;
+}
+.town-map .fields path {
+  fill: url(#field-lines);
+  stroke: #a79f66;
+  stroke-width: 2;
+  stroke-dasharray: none;
+}
+.town-map .river {
+  stroke: #71bcca;
+  stroke-width: 39;
+  opacity: 1;
+}
+.town-map .river-ripples {
+  fill: none;
+  stroke: #c7f6e9;
+  stroke-width: 2;
+  stroke-dasharray: 24 30;
+  animation: water-flow 5s linear infinite;
+}
+.town-map .road {
+  stroke: #e8c994;
+  stroke-width: 41;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.town-map .road-marking {
+  stroke: #fff2c8;
+  stroke-width: 2.5;
+  stroke-dasharray: 4 17;
+}
+.town-map .path {
+  stroke: #fff7df;
+  stroke-width: 12;
+  stroke-linecap: round;
+  stroke-dasharray: 3 8;
+}
+.town-map .crosswalk path {
+  stroke: #fffdf0;
+  stroke-width: 4;
+  stroke-linecap: round;
+}
+.town-map .rail-bed {
+  stroke: #756b63;
+  stroke-width: 15;
+}
+.town-map .rail-ties {
+  stroke: #f7e3b5;
+  stroke-width: 11;
+}
+.town-map .rail-line {
+  stroke: #e6f0e2;
+  stroke-width: 3;
+}
+.town-map .active-route {
+  stroke: #ed736f;
+  stroke-width: 4;
+  stroke-dasharray: 2 7;
+  stroke-linecap: round;
+  filter: drop-shadow(0 1px 0 #fff7e4);
+}
+.town-map .station rect {
+  fill: #ffe7a3;
+  stroke: #4b5a50;
+  stroke-width: 2;
+  rx: 5px;
+}
+.town-map .station text {
+  fill: #3d5152;
+  font-size: 8px;
+  font-weight: 900;
+}
+.town-map .map-labels text {
+  fill: #507969;
+  font:
+    900 18px Georgia,
+    serif;
+  letter-spacing: 0.11em;
+  paint-order: stroke;
+  stroke: #ddedc2;
+  stroke-width: 5;
+}
+.town-map .map-note {
+  fill: #586e61;
+  font:
+    700 11px Georgia,
+    serif;
+}
+.town-map .sun-doodle {
+  fill: #ffe399;
+  stroke: #dc9254;
+  stroke-width: 2.5;
+  stroke-linecap: round;
+  transform-origin: 1170px 64px;
+  animation: sun-rotate 32s linear infinite;
+}
+.town-map .sun-doodle path {
+  fill: none;
+}
+.town-map .place {
+  cursor: pointer;
+  transition: filter 0.2s ease;
+}
+.town-map .place:hover,
+.town-map .place:focus-visible {
+  filter: brightness(1.08) drop-shadow(0 3px 0 #fef8e6);
+  outline: none;
+}
+.town-map .place-hit {
+  fill: transparent !important;
+  stroke: none !important;
+}
+.town-map .place-selected .house-shadow,
+.town-map .place-selected .park-lawn {
+  filter: drop-shadow(0 0 5px #ffe99e);
+}
+.town-map .place-selected .house-wall,
+.town-map .place-selected .park-lawn {
+  stroke: #ee785d;
+  stroke-width: 3;
+}
+.town-map .house-shadow {
+  fill: #617d66;
+  opacity: 0.27;
+  stroke: none;
+}
+.town-map .house-wall {
+  fill: #fff4d5;
+  stroke: #4a5954;
+  stroke-width: 2.5;
+  stroke-linejoin: round;
+}
+.town-map .house-side {
+  fill: #e9c0a1;
+  stroke: #4a5954;
+  stroke-width: 2.4;
+}
+.town-map .house-roof {
+  fill: #f17870;
+  stroke: #4a5954;
+  stroke-width: 3;
+  stroke-linejoin: round;
+}
+.town-map .house-roof-side {
+  fill: #cf5b5d;
+  stroke: #4a5954;
+  stroke-width: 2.3;
+}
+.town-map .roof-pencil {
+  fill: none;
+  stroke: #bc5554;
+  stroke-width: 1.2;
+  stroke-linecap: round;
+  opacity: 0.7;
+}
+.town-map .building-color-1 .house-roof {
+  fill: #e9aa55;
+}
+.town-map .building-color-1 .house-roof-side {
+  fill: #c88944;
+}
+.town-map .building-color-2 .house-roof {
+  fill: #83a9b1;
+}
+.town-map .building-color-2 .house-roof-side {
+  fill: #658992;
+}
+.town-map .building-color-3 .house-roof {
+  fill: #b696bb;
+}
+.town-map .building-color-3 .house-roof-side {
+  fill: #907296;
+}
+.town-map .building-color-4 .house-roof {
+  fill: #91ad70;
+}
+.town-map .building-color-4 .house-roof-side {
+  fill: #718d56;
+}
+.town-map .place-bakery .house-roof {
+  fill: #ef8278;
+}
+.town-map .place-shop .house-roof {
+  fill: #ebae5b;
+}
+.town-map .place-bar .house-roof {
+  fill: #a17aa2;
+}
+.town-map .house-chimney {
+  fill: #eeac87;
+  stroke: #4a5954;
+  stroke-width: 2;
+}
+.town-map .chimney-smoke {
+  fill: none;
+  stroke: #fffaf1;
+  stroke-width: 3;
+  stroke-linecap: round;
+  opacity: 0.8;
+  animation: smoke-rise 3s ease-out infinite;
+}
+.town-map .house-door {
+  fill: #86a9a4;
+  stroke: #4a5954;
+  stroke-width: 2;
+}
+.town-map .door-knob {
+  fill: #f4ca68;
+}
+.town-map .house-window {
+  fill: #a7dbe1;
+  stroke: #4a5954;
+  stroke-width: 2;
+}
+.town-map .window-cross {
+  fill: none;
+  stroke: #fef7dc;
+  stroke-width: 1.6;
+}
+.town-map .window-planter {
+  stroke: #5d896d;
+  stroke-width: 3;
+  fill: none;
+}
+.town-map .store-awning {
+  fill: #fff5dd;
+  stroke: #4a5954;
+  stroke-width: 2;
+}
+.town-map .awning-stripes {
+  fill: none;
+  stroke: #ec8470;
+  stroke-width: 4;
+}
+.town-map .shop-emblem {
+  fill: #fff2bf;
+  stroke: #4a5954;
+  stroke-width: 2;
+}
+.town-map .shop-emblem-letter {
+  fill: #4a5954;
+  font:
+    900 11px Georgia,
+    serif;
+  text-anchor: middle;
+  stroke: none;
+}
+.town-map .little-fence {
+  fill: none;
+  stroke: #faf3d7;
+  stroke-width: 2;
+  stroke-linecap: round;
+}
+.town-map .place-name {
+  font:
+    900 12px Georgia,
+    serif;
+  fill: #344b48;
+  paint-order: stroke;
+  stroke: #fff9e8;
+  stroke-width: 4;
+}
+.town-map .park-lawn {
+  fill: #a6d486;
+  stroke: #588d66;
+  stroke-width: 2.5;
+}
+.town-map .park-path {
+  fill: none;
+  stroke: #fcebbd;
+  stroke-width: 8;
+  stroke-linecap: round;
+}
+.town-map .fountain-basin {
+  fill: #f6e2b8;
+  stroke: #4b6d6d;
+  stroke-width: 2;
+}
+.town-map .fountain-water {
+  fill: #79c6c7;
+  stroke: #4b6d6d;
+  stroke-width: 1.5;
+}
+.town-map .fountain-jet {
+  fill: none;
+  stroke: #e3fcf3;
+  stroke-width: 2.5;
+  stroke-linecap: round;
+  animation: fountain-bob 1.3s ease-in-out infinite alternate;
+}
+.town-map .park-bench {
+  fill: none;
+  stroke: #ae7258;
+  stroke-width: 3;
+  stroke-linecap: round;
+}
+.town-map .flower-bed {
+  fill: none;
+  stroke: #ea8c78;
+  stroke-width: 4;
+  stroke-linecap: round;
+  stroke-dasharray: 2 4;
+}
+.town-map .trees .tree-shadow {
+  fill: #608d69;
+  opacity: 0.25;
+}
+.town-map .trees .tree-trunk {
+  fill: none;
+  stroke: #806349;
+  stroke-width: 4;
+  stroke-linecap: round;
+}
+.town-map .trees .tree-crown {
+  transform-origin: 0 0;
+  animation: tree-sway 4s ease-in-out infinite alternate;
+}
+.town-map .trees .tree-crown > path:first-child {
+  fill: #69a86d;
+  stroke: #3d7658;
+  stroke-width: 2.5;
+}
+.town-map .trees g:nth-child(3n) .tree-crown > path:first-child {
+  fill: #88bd6d;
+}
+.town-map .trees g:nth-child(4n) .tree-crown > path:first-child {
+  fill: #4f9b82;
+}
+.town-map .trees .tree-pencil {
+  fill: none;
+  stroke: #c6de9d;
+  stroke-width: 1.5;
+  stroke-linecap: round;
+}
+.town-map .flower-stems {
+  fill: none;
+  stroke: #548a60;
+  stroke-width: 1.5;
+}
+.town-map .flowers {
+  fill: #f48483;
+  stroke: #ac6868;
+  stroke-width: 0.8;
+}
+.town-map .flowers-1 {
+  fill: #f9ce71;
+  stroke: #d4a453;
+}
+.town-map .flowers-2 {
+  fill: #c5a1cf;
+  stroke: #9a7ba9;
+}
+.town-map .bunting > path:first-child {
+  fill: none;
+  stroke: #46645f;
+  stroke-width: 1.5;
+}
+.town-map .flag {
+  stroke: #4b5a50;
+  stroke-width: 1;
+}
+.town-map .flag-0 {
+  fill: #eb8170;
+}
+.town-map .flag-1 {
+  fill: #f4ca70;
+}
+.town-map .flag-2 {
+  fill: #78bdac;
+}
+.town-map .birds path {
+  fill: none;
+  stroke: #426c76;
+  stroke-width: 2.2;
+  stroke-linecap: round;
+}
+.town-map .compass {
+  fill: none;
+  stroke: #49605b;
+  stroke-width: 2;
+}
+.town-map .compass text {
+  fill: #49605b;
+  stroke: none;
+  font:
+    900 12px Georgia,
+    serif;
+  text-anchor: middle;
+}
+.town-map .map-entity {
+  transition: transform 0.25s linear;
+}
+.town-map .entity-hit {
+  fill: transparent;
+  stroke: none;
+}
+.town-map .entity-shadow {
+  fill: #497b68;
+  opacity: 0.24;
+}
+.town-map .selection-ring {
+  fill: #fff7d8;
+  stroke: #ef876b;
+  stroke-width: 2.5;
+  stroke-dasharray: 3 3;
+  animation: selection-pulse 1.5s ease-in-out infinite;
+}
+.town-map .person-head {
+  fill: #f5bd8b;
+  stroke: #5d5046;
+  stroke-width: 1.4;
+}
+.town-map .person-hair {
+  fill: #544742;
+}
+.town-map .person-face {
+  fill: none;
+  stroke: #654b44;
+  stroke-width: 1.3;
+  stroke-linecap: round;
+}
+.town-map .person-torso {
+  fill: #5d9da9;
+  stroke: #435d60;
+  stroke-width: 1.5;
+}
+.town-map .palette-coral .person-torso {
+  fill: #e97b74;
+}
+.town-map .palette-green .person-torso {
+  fill: #8bb76b;
+}
+.town-map .palette-plum .person-torso {
+  fill: #a385b6;
+}
+.town-map .palette-ochre .person-torso {
+  fill: #e5af60;
+}
+.town-map .person-arm,
+.town-map .person-legs {
+  stroke: #435451;
+  stroke-width: 2.8;
+}
+.town-map .is-walking .leg-left {
+  transform-origin: -4px 10px;
+  animation: leg-step 0.55s ease-in-out infinite alternate;
+}
+.town-map .is-walking .leg-right {
+  transform-origin: 4px 10px;
+  animation: leg-step 0.55s ease-in-out infinite alternate-reverse;
+}
+.town-map .person .person-body {
+  animation-delay: var(--motion-delay);
+}
+.town-map .pet .pet-tail {
+  fill: none;
+  stroke: #67422d;
+  stroke-width: 2;
+  transform-origin: -8px 4px;
+  animation: tail-wag 0.5s ease-in-out infinite alternate;
+}
+.town-map .folk-train {
+  transition: transform 0.25s linear;
+}
+.town-map .train-locomotive {
+  fill: #f0786d;
+  stroke: #574c48;
+}
+.town-map .train-coach {
+  fill: #ffe1a5;
+  stroke: #574c48;
+}
+.town-map .train-roof-kit {
+  fill: #92b5ab;
+}
+.town-map .train-windows {
+  stroke: #8fc9d1;
+}
+.town-map .train-bogies {
+  stroke: #474e50;
+}
+.time-controls {
+  background: #fff9eb;
+  padding: 1rem 1.2rem;
+}
+.time-controls button {
+  font-weight: 800;
+  border: 2px solid #405f58;
+  box-shadow: 2px 3px 0 #a6b8a5;
+}
+.time-controls button:hover {
+  transform: translateY(-3px) rotate(-1deg);
+  box-shadow: 3px 5px 0 #a6b8a5;
+}
+.time-controls button:focus-visible,
+.household-members button:focus-visible {
+  outline: 3px solid #df846f;
+  outline-offset: 3px;
+}
+.time-controls .primary-button {
+  background: #ed806b;
+  color: #fffdf1;
+  border-color: #a75e55;
+}
+.time-controls .secondary-button {
+  background: #f9e9bd;
+  color: #375551;
+}
+.time-controls .is-running {
+  background: #6dafa0;
+  color: #153f3b;
+}
+.inspector h2 {
+  color: #344e4e;
+}
+.inspector .activity {
+  color: #b96155;
+}
+.inspector .eyebrow {
+  color: #5b8a76;
+}
+.inspector .needs i {
+  background: #e3e5d2;
+  height: 9px;
+  border: 1px solid #abbea4;
+}
+.inspector .needs b {
+  background: linear-gradient(90deg, #7bbf9f, #e0bd75);
+}
+.inspector .event-feed {
+  border-top: 2px dashed #c7c4a6;
+}
+.town-map.is-paused *,
+.town-map.is-paused *::before,
+.town-map.is-paused *::after {
+  animation-play-state: paused !important;
+}
+@keyframes water-flow {
+  to {
+    stroke-dashoffset: -54;
+  }
+}
+@keyframes smoke-rise {
+  to {
+    transform: translateY(-12px);
+    opacity: 0;
+  }
+}
+@keyframes tree-sway {
+  to {
+    transform: rotate(3deg);
+  }
+}
+@keyframes sun-rotate {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@keyframes fountain-bob {
+  to {
+    transform: translateY(-3px);
+    opacity: 0.7;
+  }
+}
+@keyframes leg-step {
+  to {
+    transform: rotate(25deg);
+  }
+}
+@keyframes tail-wag {
+  to {
+    transform: rotate(28deg);
+  }
+}
+@keyframes selection-pulse {
+  to {
+    opacity: 0.5;
+    stroke-width: 4;
+  }
+}
+@media (max-width: 850px) {
+  .town-layout {
+    grid-template-columns: 1fr;
+  }
+  .town-map {
+    min-height: 0;
+  }
+  .town-header {
+    align-items: start;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .town-map *,
+  .town-map *::before,
+  .town-map *::after {
+    animation: none !important;
+    transition: none !important;
+  }
+  .time-controls button {
+    transition: none;
+  }
+}

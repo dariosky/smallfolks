@@ -1,3 +1,4 @@
+import asyncio
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
@@ -11,16 +12,34 @@ from routes.health import router as health_router
 from routes.html import router as html_router
 from routes.worlds import router as worlds_router
 from services.static_files import ImmutableStaticFiles
+from services.worlds import tick_running_worlds
+
+WORLD_TICK_INTERVAL_SECONDS = 0.25
+
+
+async def world_tick_loop() -> None:
+    while True:
+        await asyncio.sleep(WORLD_TICK_INTERVAL_SECONDS)
+        await asyncio.to_thread(tick_running_worlds)
 
 
 @asynccontextmanager
 async def app_lifespan(_: FastAPI):
-    yield
+    task = None if settings.TESTING_MODE else asyncio.create_task(world_tick_loop())
+    try:
+        yield
+    finally:
+        if task is not None:
+            task.cancel()
+            try:
+                await task
+            except asyncio.CancelledError:
+                pass
 
 
 def create_app() -> FastAPI:
     app = FastAPI(
-        title="Smallfolk",
+        title="SmallFolks",
         description="A calm, inspectable city-life simulation.",
         version="0.1.0",
         docs_url="/docs" if settings.DEBUG else None,

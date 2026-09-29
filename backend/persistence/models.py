@@ -12,6 +12,7 @@ class WorldSnapshot(SQLModel, table=True):
 
     id: str = Field(primary_key=True, max_length=80)
     seed: int = Field(index=True)
+    world_format_version: int = Field(default=0, nullable=False)
     state_json: str
     created_at: datetime = Field(default_factory=utcnow, nullable=False)
     updated_at: datetime = Field(default_factory=utcnow, nullable=False)

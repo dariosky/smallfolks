@@ -72,26 +72,40 @@ Preserve the user's current direction: strict top-down, detailed cartoon art, bu
 
 **Scope:** small prerequisite; no new gameplay.
 
-- [ ] Record the partial `poc-9` train changes as unfinished, including the frontend/backend contract mismatch; preserve them for completion in step 2.
-- [ ] Isolate checks from developer saves. Keep a reproducible fixture and capture its current visible behaviour.
-- [ ] Define world-format, generation and simulation versions separately; specify how old snapshots are loaded, migrated, archived or explicitly rejected with an explanation.
-- [ ] Define the minimum typed contracts for clock/revision, location, activity, journey, train, carriage, seat and station queue. A person's location is at a place, on a route, on a platform or inside a vehicle—not independent conflicting flags.
-- [ ] Correct README claims and record the first acceptance scenario. Preserve SQLModel/Alembic and the current local/production serving setup.
+- [x] Record the partial `poc-9` train changes as unfinished, including the frontend/backend contract mismatch; preserve them for completion in step 2.
+- [x] Isolate checks from developer saves. Keep a reproducible fixture and capture its current visible behaviour.
+- [x] Define world-format, generation and simulation versions separately; specify how old snapshots are loaded, migrated, archived or explicitly rejected with an explanation.
+- [x] Define the minimum typed contracts for clock/revision, location, activity, journey, train, carriage, seat and station queue. A person's location is at a place, on a route, on a platform or inside a vehicle—not independent conflicting flags.
+- [x] Correct README claims and record the first acceptance scenario. Preserve SQLModel/Alembic and the current local/production serving setup.
 
 **Done when:** a developer can load a known world, identify its versions and unfinished behaviour, and run checks without altering their saved town.
+
+### Step 0 implementation record (2026-09-29)
+
+- The known fixture remains `world:poc-9-{seed}` and its partial train work is deliberately preserved: `simulation/tick.py` publishes clock-driven service state, while `TownMap.tsx` still drives a separate animation and reads incompatible queue wording. Step 2 owns the behavioural completion; no gameplay was changed here.
+- Current snapshots use `world_format_version: 1`, `generation_version: "poc-9"`, `simulation_version: "poc-1"`, and a command `revision`. Format 0 (no format/revision marker) is read through an additive in-memory migration and is persisted as format 1 only after a command changes state. Unknown future and retired formats return an explained compatibility error; unsupported-save archival/export is intentionally left for step 9.
+- `simulation/contracts.py` now defines the planned JSON vocabulary. It is a type boundary, not a parallel runtime state machine: step 1 will make clock/revision authoritative and step 2 will populate train/carriage/seat/queue state.
+- Backend tests now use a per-run temporary SQLite database and apply Alembic migrations before each scenario. The known fixture is the reproducible baseline. The captured behaviour is still intentionally incomplete: scripted schedules can teleport, needs do not accumulate per normal one-minute update, and the frontend train does not follow backend train state.
+- First acceptance scenario: create fixture seed `90111`; verify format, generation and simulation versions; advance 30 minutes; reload and verify the same clock and a revision increment. This proves snapshot identity and isolated checks only—not route or train correctness.
 
 ## Step 1 — one simulation clock and route-faithful movement
 
 **Depends on:** 0. **Primary files:** simulation, world service/API, `TownPage.tsx`, `TownMap.tsx`.
 
-- [ ] Store elapsed simulation time in seconds and use a fixed logical update cadence, independent of render FPS and request grouping. Choose cadence through a short walking/boarding experiment rather than assuming one game minute per update is adequate.
-- [ ] Add authoritative run/pause/speed state. Opening the town starts/resumes through an explicit server-owned command; additional tabs observe the same world. Serialize updates and include revisions to reject stale/conflicting mutations.
-- [ ] Make manual advancement and automatic running use the same engine. Define offline behaviour explicitly (initial recommendation: no catch-up while unloaded).
+- [x] Store elapsed simulation time in seconds and use a fixed logical update cadence, independent of render FPS and request grouping. The initial cadence is 15 logical seconds every 250 ms; it is covered by grouped-versus-stepped equivalence tests and should be revisited with a browser walking/boarding observation.
+- [x] Add authoritative run/pause/speed state. Opening the town starts/resumes through an explicit server-owned command; tabs observe the same saved world by polling. Per-world locks and revisions reject stale/conflicting mutations.
+- [x] Make manual advancement and automatic running use the same engine. There is no offline catch-up: only the running server tick advances state.
 - [ ] Represent a journey as persisted legs with start/end, edge IDs, mode, distance and progress. Complete one leg before starting another.
-- [ ] Fix fractional need accumulation and batch-versus-small-step equivalence.
-- [ ] Render all motion against one presentation timestamp using route progress, not direct point-to-point chords. Freeze train, people and activity animations consistently when paused; handle delayed responses without inventing arrivals.
+- [x] Fix fractional need accumulation and batch-versus-small-step equivalence.
+- [ ] Render all motion against one presentation timestamp using route progress, not direct point-to-point chords. The train now follows the server’s position at the 250 ms observation cadence, but pedestrian route execution, pause-consistent animation and delayed-response presentation still need completion.
 
 **Done when:** a pedestrian follows a corner at every speed; pausing freezes all motion; two tabs do not double world speed; advancing ten minutes at once matches equivalent smaller steps.
+
+### Step 1 progress record (2026-09-29)
+
+- The server tick is deliberately polling-based for this small POC: a WebSocket is not needed to make the authoritative clock smooth. The app sends no browser advance timer; it observes a running world every 250 ms. A later event/delta channel can replace polling without changing the clock contract.
+- `simulation.elapsed_seconds`, `presentation_time_seconds`, `running` and `speed` are persisted in the snapshot. The server advances 15 logical seconds per 250 ms at speed 1, scales that step by speed, and persists a new revision. Existing format-0 saves receive a stopped simulation state on load.
+- Journey objects now accompany the existing walk/train route data as an interim persisted contract. The current route graph and schedule still need the step’s full leg-completion/replanning rewrite, so this step is not yet complete.
 
 ## Step 2 — finish the train, queues and visible passengers
 

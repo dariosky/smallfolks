@@ -4,7 +4,7 @@ import setproctitle
 import uvicorn
 
 
-setproctitle.setproctitle("Smallfolk DEV API")
+setproctitle.setproctitle("SmallFolks DEV API")
 
 if __name__ == "__main__":  # pragma: no cover
     uvicorn.run(

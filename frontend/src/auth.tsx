@@ -60,7 +60,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
     isAuthenticated: Boolean(currentUserQuery.data),
     isLoading: currentUserQuery.isLoading,
     authLoadError: currentUserQuery.isError
-      ? errorMessage(currentUserQuery.error, "Unable to reach Smallfolk right now.")
+      ? errorMessage(currentUserQuery.error, "Unable to reach SmallFolks right now.")
       : null,
     isAuthRetrying: currentUserQuery.isFetching,
     error,

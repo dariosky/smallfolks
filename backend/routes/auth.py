@@ -173,10 +173,10 @@ REGISTER_SUCCESS_MESSAGE = (
     "Your account is being set up. Check your inbox to verify your email."
 )
 PASSWORD_RESET_REQUEST_MESSAGE = (  # nosec: B105
-    "If that email has a Smallfolk account, we sent a password reset link."
+    "If that email has a SmallFolks account, we sent a password reset link."
 )
 MAGIC_LOGIN_REQUEST_MESSAGE = (  # nosec: B105
-    "If that email has a Smallfolk account, we sent a sign-in link."
+    "If that email has a SmallFolks account, we sent a sign-in link."
 )
 
 
