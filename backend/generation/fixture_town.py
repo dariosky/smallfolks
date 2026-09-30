@@ -1,8 +1,10 @@
 from copy import deepcopy
 
+from generation.city_layout import ensure_city_layout
 from generation.validators import validate_place_layout
 from simulation.economy import ensure_economy
 from simulation.housing import ensure_home_parking
+from simulation.prosperity import ensure_prosperity
 from simulation.tick import STATIONS, rail_track
 from simulation.versions import WORLD_FORMAT_VERSION
 
@@ -281,24 +283,8 @@ def build_fixture(seed: int) -> dict:
         },
         "places": places,
         "households": households,
-        "roads": [
-            {"id": "road:grand-avenue", "points": [[45, 350], [1140, 350]]},
-            {"id": "road:west-avenue", "points": [[365, 55], [365, 670]]},
-            {"id": "road:east-avenue", "points": [[850, 55], [850, 350], [1140, 350], [1140, 670]]},
-            {"id": "road:rowan-north", "points": [[45, 170], [365, 170]]},
-            {"id": "road:rowan-middle", "points": [[45, 330], [365, 330]]},
-            {"id": "road:rowan-south", "points": [[45, 520], [365, 520]]},
-            {"id": "road:market-street", "points": [[365, 235], [850, 235]]},
-            {"id": "road:orchard-street", "points": [[365, 520], [800, 520]]},
-            {"id": "road:eastgate-lane", "points": [[800, 520], [800, 485], [1140, 485]]},
-        ],
-        "paths": [
-            {"id": "path:rowan", "points": [[45, 145], [365, 145], [365, 520]]},
-            {"id": "path:centre", "points": [[365, 210], [850, 210], [850, 620]]},
-            {"id": "path:grand", "points": [[365, 375], [850, 375]]},
-            {"id": "path:old-centre", "points": [[420, 185], [800, 185], [800, 350]]},
-            {"id": "path:eastgate", "points": [[850, 250], [1080, 250], [1080, 520]]},
-        ],
+        "roads": [],
+        "paths": [],
         "people": people,
         "pets": [
             {
@@ -357,24 +343,10 @@ def build_fixture(seed: int) -> dict:
         ],
     }
     world["map_size"] = {"width": 1200, "height": 1000}
-    world["roads"].extend([
-        {"id": "road:south-avenue", "points": [[45, 670], [1140, 670]]},
-        {"id": "road:willow-link", "points": [[365, 670], [365, 920]]},
-        {"id": "road:willow-street", "points": [[60, 920], [1080, 920]]},
-        {"id": "road:east-link", "points": [[850, 670], [850, 920]]},
-    ])
-    # Connect each front entrance to a street, including civic buildings and parks.
-    from simulation.routing import nearest_road_point
-
-    streets = list(world["roads"])
-    for place in places:
-        entrance = {"x": place["position"]["x"], "y": place["position"]["y"] + 48}
-        street = nearest_road_point(streets, entrance)
-        points = [[street["x"], street["y"]], [entrance["x"], entrance["y"]]]
-        if points[0] != points[1]:
-            world["roads"].append({"id": f"road:access-{place['id']}", "points": points})
+    ensure_city_layout(world)
     ensure_home_parking(world)
     ensure_economy(world)
+    ensure_prosperity(world)
     return world
 
 

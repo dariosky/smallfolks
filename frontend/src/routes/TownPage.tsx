@@ -11,7 +11,10 @@ import {
   type Place,
   type World,
 } from "../api/world";
+import { BankDetails, DealershipDetails, HomeDevelopment, ResidentProsperity } from "../world/ProsperityDetails";
 import { TownMap } from "../world/TownMap";
+import { ShopPeople } from "../world/ShopPeople";
+import { PersonName } from "../world/PersonName";
 
 type Selection = Entity | Place;
 
@@ -261,10 +264,11 @@ export function TownPage() {
                       <strong>Car trip:</strong> {selectedEntity.car_trip.phase} · {world?.vehicles.find((vehicle) => vehicle.id === selectedEntity.car_trip?.vehicle_id)?.name ?? selectedEntity.car_trip.vehicle_id} to {world?.places.find((place) => place.id === selectedEntity.car_trip?.destination_id)?.name ?? selectedEntity.car_trip.destination_id}
                     </p>
                   ) : null}
+                  {selectedEntity.kind === "vehicle" && selectedEntity.model === "sports" ? <p><strong>Model:</strong> Luxury sports car · 60% faster cruising</p> : null}
                   {selectedEntity.kind === "vehicle" ? (
                     <p>
-                      <strong>Owner:</strong> {world?.people.find((person) => person.id === selectedEntity.owner_id)?.name ?? "unknown"}
-                      {selectedEntity.driver_id ? ` · Driven by ${world?.people.find((person) => person.id === selectedEntity.driver_id)?.name ?? selectedEntity.driver_id}` : selectedEntity.reserved_by ? ` · Reserved by ${world?.people.find((person) => person.id === selectedEntity.reserved_by)?.name ?? selectedEntity.reserved_by}` : " · Available"}
+                      <strong>Owner:</strong> <PersonName people={world?.people ?? []} personId={selectedEntity.owner_id} onSelect={setSelected} fallback="unknown" />
+                      {selectedEntity.driver_id ? <> · Driven by <PersonName people={world?.people ?? []} personId={selectedEntity.driver_id} onSelect={setSelected} fallback={selectedEntity.driver_id} /></> : selectedEntity.reserved_by ? <> · Reserved by <PersonName people={world?.people ?? []} personId={selectedEntity.reserved_by} onSelect={setSelected} fallback={selectedEntity.reserved_by} /></> : " · Available"}
                     </p>
                   ) : null}
                   {selectedEntity.needs ? (
@@ -288,6 +292,7 @@ export function TownPage() {
                   ) : null}
                   {selectedHousehold ? (
                     <>
+                      <ResidentProsperity world={world!} person={selectedEntity} />
                       <p><strong>Personal money:</strong> {money(selectedEntity.money_cents ?? 0)}</p>
                       <p><strong>Shared household money:</strong> {money(selectedHousehold.money_cents ?? 0)} ({world?.economy?.household_contribution_percent ?? 50}% of wages)</p>
                       <label>
@@ -327,7 +332,7 @@ export function TownPage() {
                       <p><strong>Doors:</strong> {trainState.doors_open ? "open" : "closed"} · {trainState.passenger_ids.length}/{trainState.capacity} seats occupied</p>
                       {trainState.carriages.map((carriage, index) => (
                         <p key={carriage.id}>
-                          <strong>Coach {index + 1}:</strong> {carriage.seats.map((seat) => seat.passenger_id ? world?.people.find((person) => person.id === seat.passenger_id)?.name ?? seat.passenger_id : "empty").join(" · ")}
+                          <strong>Coach {index + 1}:</strong> {carriage.seats.map((seat, seatIndex) => <span key={seat.id}>{seatIndex > 0 ? " · " : ""}{seat.passenger_id ? <PersonName people={world?.people ?? []} personId={seat.passenger_id} onSelect={setSelected} fallback={seat.passenger_id} /> : "empty"}</span>)}
                         </p>
                       ))}
                     </section>
@@ -343,9 +348,7 @@ export function TownPage() {
                         })}
                       </ul>
                     </section>
-                  ) : (
-                    <p className="why">A semantic place: {labelsFor(currentSelection.kind)}.</p>
-                  )}
+                  ) : null}
                   {selectedPlace?.kind === "home" ? (
                     selectedHomeHousehold ? (
                       <section className="household-members">
@@ -366,10 +369,14 @@ export function TownPage() {
                       <p className="why">This home is currently unoccupied.</p>
                     )
                   ) : null}
+                  {selectedPlace?.kind === "home" && world ? <HomeDevelopment world={world} home={selectedPlace} onSelect={setSelected} /> : null}
+                  {selectedPlace?.id === "place:bank" && world ? <BankDetails world={world} onSelect={setSelected} /> : null}
+                  {selectedPlace?.dealership ? <DealershipDetails workshop={selectedPlace} /> : null}
                   {selectedPlace?.business ? (
                     <section className="business-details">
+                      <ShopPeople place={selectedPlace} people={world?.people ?? []} onSelect={setSelected} />
                       <p><strong>Business:</strong> {selectedPlace.business.status} · {money(selectedPlace.business.balance_cents)}</p>
-                      <p><strong>Owner:</strong> {world?.people.find((person) => person.id === selectedPlace.business?.owner_id)?.name ?? "None"}</p>
+                      <p><strong>Owner:</strong> <PersonName people={world?.people ?? []} personId={selectedPlace.business.owner_id ?? undefined} onSelect={setSelected} fallback="None" /></p>
                       <p><strong>Price:</strong> {money(selectedPlace.business.unit_price_cents)} {selectedPlace.id === "place:supermarket" ? "per serving" : "per sale"}</p>
                       <p><strong>Wider town customers today:</strong> {selectedPlace.business.regional_visits_today} · {money(selectedPlace.business.regional_sales_cents_today)} sales</p>
                       {selectedPlace.business.status === "bankrupt" ? (

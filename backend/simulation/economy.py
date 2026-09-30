@@ -1,6 +1,6 @@
 """Small integer-cent economy. All transfers share one saved ledger."""
 
-from datetime import datetime
+from datetime import datetime, timedelta
 
 BUSINESS_IDS = {
     "place:bakery",
@@ -106,6 +106,10 @@ def ensure_economy(world: dict) -> dict:
 
 
 def _balance_ref(world: dict, account_id: str) -> tuple[dict, str]:
+    if account_id == "bank":
+        return world["economy"], "bank_cents"
+    if account_id == "construction":
+        return world["economy"], "construction_cents"
     if account_id == "treasury":
         return world["economy"], "treasury_cents"
     if account_id == "outside":
@@ -120,9 +124,8 @@ def _balance_ref(world: dict, account_id: str) -> tuple[dict, str]:
         return next(
             item for item in world["households"] if item["id"] == account_id
         ), "money_cents"
-    return next(item for item in world["places"] if item["id"] == account_id)[
-        "business"
-    ], "balance_cents"
+    place = next(item for item in world["places"] if item["id"] == account_id)
+    return place["dealership"] if account_id == "place:workshop" else place["business"], "balance_cents"
 
 
 def can_pay(world: dict, account_id: str, cents: int) -> bool:
@@ -298,12 +301,6 @@ def consider_takeovers(world: dict, now: datetime) -> None:
                 person
                 for person in candidates
                 if person["money_cents"] >= minimum_cash
-                and not any(
-                    item["id"] != place["id"]
-                    and item.get("business", {}).get("owner_id") == person["id"]
-                    and item["business"]["status"] == "open"
-                    for item in world["places"]
-                )
             ),
             None,
         )
@@ -408,6 +405,8 @@ def pay_work_seconds(world: dict, person: dict, seconds: int, now: datetime) -> 
     if personal_share:
         transfer(world, employer, person["id"], personal_share, "Wages", now)
 
+    record_income(person, personal_share, now)
+
 
 def charge_daily_overhead(world: dict, now: datetime) -> None:
     for place in world["places"]:
@@ -458,3 +457,12 @@ def pay_owner_dividends(world: dict, now: datetime) -> None:
                 "Owner dividend",
                 now,
             )
+
+
+def record_income(person: dict, cents: int, now: datetime) -> None:
+    """Keep recent observed personal earnings for bank affordability checks."""
+    history = person.setdefault("income_history", {})
+    day = now.date().isoformat()
+    history[day] = history.get(day, 0) + cents
+    cutoff = (now.date() - timedelta(days=13)).isoformat()
+    person["income_history"] = {key: value for key, value in history.items() if key >= cutoff}

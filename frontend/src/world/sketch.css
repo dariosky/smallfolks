@@ -102,6 +102,9 @@
   stroke-linecap: round;
   stroke-linejoin: round;
 }
+.town-map .road-access {
+  stroke-width: 10;
+}
 .town-map .road-marking {
   stroke: #fff2c8;
   stroke-width: 2.5;
@@ -672,6 +675,20 @@
 }
 .town-map .train-bogies {
   stroke: #474e50;
+}
+.person-name {
+  background: none;
+  border: 0;
+  padding: 0;
+  color: inherit;
+  font: inherit;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+.person-name:focus-visible {
+  outline: 3px solid #df846f;
+  outline-offset: 3px;
 }
 .time-controls {
   background: #fff9eb;
@@ -1460,3 +1477,111 @@
   stroke-width: 1.5;
   stroke-dasharray: 4 3;
 }
+
+.town-map .construction-scaffold {
+  fill: none;
+  stroke: #8a7358;
+  stroke-width: 2;
+}
+.town-map .construction-barrier {
+  fill: #edc764;
+  stroke: #584d43;
+  stroke-width: 1.5;
+}
+.town-map .construction-stripes {
+  stroke: #584d43;
+  stroke-width: 3;
+}
+.town-map .construction-progress {
+  text-anchor: middle;
+  font-size: 12px;
+  fill: #584d43;
+}
+.town-map .bank-front {
+  fill: #f0e8cd;
+  stroke: #665d50;
+  stroke-width: 2;
+}
+.town-map .bank-sign {
+  text-anchor: middle;
+  fill: #665d50;
+  font-size: 12px;
+  font-weight: bold;
+}
+
+.town-map .vehicle.palette-ruby { --vehicle-paint: #b51548; }
+.town-map .vehicle.palette-sapphire { --vehicle-paint: #2859dc; }
+.town-map .vehicle.palette-emerald { --vehicle-paint: #09816b; }
+.town-map .vehicle.palette-amethyst { --vehicle-paint: #9146ca; }
+.town-map .vehicle.palette-champagne { --vehicle-paint: #d5b25a; }
+.town-map .sports-car-body .vehicle-shell { stroke-width: 1.5; }
+.town-map .sports-car-body .vehicle-roof { fill: #253e4b; stroke: #c7d4d7; stroke-width: .8; }
+.town-map .sports-car-body .vehicle-windshield,
+.town-map .sports-car-body .vehicle-rear-window { fill: #284658; stroke: #90c5d5; stroke-width: .8; }
+.town-map .sports-car-spoiler { fill: #24353f; stroke: #dae4e1; stroke-width: .7; }
+.town-map .sports-car-vents { fill: none; stroke: #233b43; stroke-width: 1.5; }
+.town-map .sports-car-highlight { fill: none; stroke: #fff1d6; stroke-width: .8; opacity: .7; }
+
+.town-map .entrance-steps {
+  stroke: #574c48;
+  stroke-width: 2;
+  stroke-linecap: round;
+}
+
+/* Driveway homes have a taller country-house silhouette and planted grounds. */
+.town-map .estate-lawn { fill: #bdd398; stroke: #91ad78; stroke-width: 1; }
+.town-map .estate-garden-walk { fill: #e8deca; stroke: #c4bba6; stroke-width: 1; }
+.town-map .estate-hedge { fill: none; stroke: #638660; stroke-width: 6; stroke-linecap: round; stroke-linejoin: round; }
+.town-map .estate-flower-bed { stroke: #987958; stroke-width: 7; stroke-linecap: round; }
+.town-map .estate-flower-stem { stroke: #638660; stroke-width: 1.3; }
+.town-map .estate-flower { fill: #d88c9e; }
+.town-map .estate-flower-gold { fill: #f0ce78; }
+.town-map .estate-tree-trunk { stroke: #8d735c; stroke-width: 3; }
+.town-map .estate-tree-crown { fill: #7ca274; stroke: #577c5b; stroke-width: 1.5; }
+.town-map .estate-wall, .town-map .estate-wing, .town-map .estate-dormer {
+  fill: #f7ecd7; stroke: #59645e; stroke-width: 2; stroke-linejoin: round;
+}
+.town-map .estate-side { fill: #d7cdb7; stroke: #59645e; stroke-width: 2; }
+.town-map .estate-roof, .town-map .estate-wing-roof, .town-map .estate-porch-roof {
+  fill: #667983; stroke: #465860; stroke-width: 2.3; stroke-linejoin: round;
+}
+.town-map .estate-roof-side { fill: #495e69; stroke: #465860; stroke-width: 2; }
+.town-map .estate-roof-lines { stroke: #8ea0a5; stroke-width: 1; fill: none; }
+.town-map .estate-dormer-roof { stroke: #465860; stroke-width: 3; fill: none; stroke-linejoin: round; }
+.town-map .estate-chimney { fill: #c8997d; stroke: #59645e; stroke-width: 1.8; }
+.town-map .estate-window { fill: #b2d9de; stroke: #62716e; stroke-width: 1.5; }
+.town-map .estate-window-bars { fill: none; stroke: #fff9e9; stroke-width: 1.4; }
+.town-map .estate-shutters { fill: none; stroke: #6b8b7c; stroke-width: 3; }
+.town-map .estate-door { fill: #557469; stroke: #445d55; stroke-width: 1.8; }
+.town-map .estate-porch-floor { fill: #d8cbb7; stroke: #7e8070; stroke-width: 1.2; }
+.town-map .estate-porch-columns { stroke: #fdf7e8; stroke-width: 4; }
+.town-map .estate-porch-rail { fill: none; stroke: #ede3ce; stroke-width: 2; }
+.town-map .estate-steps { fill: none; stroke: #a99c87; stroke-width: 2; stroke-linecap: round; }
+
+.town-map .mansion-lawn { fill: #b5ce92; stroke: #8ea975; stroke-width: 1.5; }
+.town-map .mansion-wall { fill: none; stroke: #c6b697; stroke-width: 8; stroke-linejoin: round; }
+.town-map .mansion-wall-cap { fill: none; stroke: #eee0c5; stroke-width: 2; }
+.town-map .mansion-garden-path { fill: none; stroke: #e5ddbd; stroke-width: 9; stroke-linecap: round; }
+.town-map .mansion-driveway { fill: none; stroke: #b3b0a2; stroke-width: 20; stroke-linejoin: round; }
+.town-map .mansion-parking rect { fill: #b3b0a2; stroke: #f7edce; stroke-width: 1.5; }
+.town-map .mansion-parking text { fill: #f7edce; font-size: 10px; text-anchor: middle; font-family: serif; }
+.town-map .mansion-flower-bed { fill: #987b5d; stroke: #719264; stroke-width: 4; }
+.town-map .mansion-hedge { fill: none; stroke: #64875e; stroke-width: 7; stroke-linecap: round; }
+.town-map .mansion-facade, .town-map .mansion-dormer { fill: #fff0d9; stroke: #677065; stroke-width: 2.2; }
+.town-map .mansion-wing { fill: #ede1c9; stroke: #677065; stroke-width: 2; }
+.town-map .mansion-roof, .town-map .mansion-wing-roof { fill: #587481; stroke: #3d5864; stroke-width: 2.5; stroke-linejoin: round; }
+.town-map .mansion-roof-lines { fill: none; stroke: #91a6ad; stroke-width: 1.3; }
+.town-map .mansion-dormer-roof { fill: none; stroke: #3d5864; stroke-width: 3; stroke-linejoin: round; }
+.town-map .mansion-window { fill: #a7d3dc; stroke: #758b8d; stroke-width: 1.5; }
+.town-map .mansion-window-bars { fill: none; stroke: #fff9e9; stroke-width: 1.5; }
+.town-map .mansion-floor-trim { fill: none; stroke: #d1c5a9; stroke-width: 3; }
+.town-map .mansion-door { fill: #48685b; stroke: #38584c; stroke-width: 2; }
+.town-map .mansion-door-trim { fill: none; stroke: #d4be91; stroke-width: 2; }
+.town-map .mansion-porch-floor { fill: #d9cbb1; stroke: #8c8e7d; stroke-width: 1.5; }
+.town-map .mansion-columns { stroke: #fffaf0; stroke-width: 5; }
+.town-map .mansion-portico { fill: #eee0bf; stroke: #8a8d78; stroke-width: 2; }
+.town-map .mansion-portico-trim { fill: none; stroke: #b6a67f; stroke-width: 1.5; }
+.town-map .mansion-balustrade { fill: none; stroke: #fff3da; stroke-width: 2.5; }
+.town-map .mansion-gate-pillar { fill: #e2d1b0; stroke: #a19378; stroke-width: 1.5; }
+.town-map .mansion-gate-finial { fill: #c4aa77; stroke: #8f846b; stroke-width: 1; }
+.town-map .mansion-open-gate { fill: none; stroke: #4c655b; stroke-width: 1.8; stroke-linejoin: round; }

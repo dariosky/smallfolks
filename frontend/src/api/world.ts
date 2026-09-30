@@ -4,7 +4,7 @@ const API_PREFIX =
   import.meta.env.VITE_API_PREFIX || (import.meta.env.DEV ? "http://127.0.0.1:5340/api" : "/api");
 
 export type Position = { x: number; y: number };
-export type Place = { id: string; name: string; kind: string; position: Position; house_style?: "large"; driveway?: { parking_position: Position; road_position: Position }; business?: {
+export type Place = { id: string; name: string; kind: string; position: Position; dealership?: { balance_cents: number; cars_sold: number; standard_price_cents: number; sports_price_cents: number }; house_style?: "large" | "mansion"; owner_household_id?: string | null; sale_price_cents?: number; construction_project_id?: string; driveway?: { parking_position: Position; parking_positions?: Position[]; road_position: Position }; business?: {
   balance_cents: number;
   status: string;
   debt_cents: number;
@@ -41,6 +41,17 @@ export type Train = {
     carriages: { id: string; passenger_ids: string[]; seats: { id: string; passenger_id: string | null }[] }[];
   };
 };
+export type Loan = {
+  id: string; borrower_id: string; purpose: string; principal_cents: number;
+  interest_cents: number; interest_percent: number; remaining_cents: number;
+  installment_cents: number; next_payment_date: string; term_days: number;
+  status: "active" | "overdue" | "repaid"; missed_payments: number; arrears_cents: number;
+};
+export type ConstructionProject = {
+  id: string; home_place_id: string; buyer_id: string; worker_id: string | null;
+  status: "queued" | "building" | "completed"; worked_seconds: number;
+  required_seconds: number; includes_driveway: boolean; cost_cents: number;
+};
 export type RenderEntity = {
   id: string;
   kind: "person" | "pet" | "vehicle";
@@ -50,6 +61,8 @@ export type RenderEntity = {
   palette: string;
 };
 export type World = {
+  loans?: Loan[];
+  construction_projects?: ConstructionProject[];
   map_size?: { width: number; height: number };
   id: string;
   seed: number;
@@ -65,7 +78,7 @@ export type World = {
   };
   places: Place[];
   households: Household[];
-  economy?: { household_contribution_percent: number; treasury_cents: number; ledger: { id: number; at: string; from: string; to: string; amount_cents: number; reason: string }[] };
+  economy?: { household_contribution_percent: number; treasury_cents: number; bank_cents?: number; construction_cents?: number; ledger: { id: number; at: string; from: string; to: string; amount_cents: number; reason: string }[] };
   roads: { id: string; points: number[][] }[];
   paths: { id: string; points: number[][] }[];
   people: Entity[];
@@ -96,6 +109,10 @@ export type Entity = {
   carrying_groceries?: boolean;
   role?: string;
   employment_status?: string;
+  workplace_id?: string;
+  direct_walk?: Record<string, unknown>;
+  credit_score?: number;
+  aspiration?: string;
   route?: Position[];
   train_departure_id?: string;
   train_arrival_id?: string;
@@ -110,6 +127,11 @@ export type Entity = {
   driver_id?: string;
   parking_place_id?: string;
   heading?: number;
+  model?: "standard" | "sports";
+  speed_units_per_minute?: number;
+  investment_goal?: "home" | "car" | "sports_car" | "shop" | "mansion" | "savings";
+  investment_target_cents?: number;
+  vehicle_purchase?: { model: "standard" | "sports" };
 };
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {

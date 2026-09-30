@@ -1,7 +1,7 @@
 import type { CSSProperties, KeyboardEvent } from "react";
 import "./sketch.css";
 
-import type { Entity, Place, Train, World } from "../api/world";
+import type { ConstructionProject, Entity, Place, Train, World } from "../api/world";
 import {
   activityKind,
   activityLabels,
@@ -91,13 +91,13 @@ export function TownMap({ world, selectedId, onSelect }: Props) {
       {world.roads.map((road) => (
         <g key={road.id}>
           <polyline
-            className="road"
+            className={road.id.startsWith("road:access-") ? "road road-access" : "road"}
             points={road.points.map((point) => point.join(",")).join(" ")}
           />
-          <polyline
+          {!road.id.startsWith("road:access-") && <polyline
             className="road-marking"
             points={road.points.map((point) => point.join(",")).join(" ")}
-          />
+          />}
         </g>
       ))}
       <g className="sidewalks">
@@ -132,6 +132,7 @@ export function TownMap({ world, selectedId, onSelect }: Props) {
           onSelect={onSelect}
           place={place}
           selected={place.id === selectedId}
+          project={world.construction_projects?.find((project) => project.id === place.construction_project_id)}
         />
       ))}
       <TownTrees />
@@ -406,18 +407,22 @@ function railPosition(track: NonNullable<Train["track"]>, distance: number) {
 }
 
 function Building({
+  project,
   place,
   onSelect,
   selected,
 }: {
   place: Place;
+  project?: ConstructionProject;
   onSelect: Props["onSelect"];
   selected: boolean;
 }) {
   const { x, y } = place.position;
   const isHome = place.kind === "home";
   const isPark = place.kind === "park";
-  const largeHome = isHome && place.house_style === "large";
+  const mansionHome = isHome && place.house_style === "mansion";
+  const estateHome = isHome && Boolean(place.driveway) && !mansionHome;
+  const largeHome = isHome && (estateHome || mansionHome || place.house_style === "large");
   const variant = [...place.id].reduce((sum, letter) => sum + letter.charCodeAt(0), 0) % 5;
   return (
     <g
@@ -433,19 +438,20 @@ function Building({
       <title>{place.name}</title>
       <rect
         className="place-hit"
-        x={isHome ? (largeHome ? -50 : -40) : -64}
-        y="-59"
-        width={isHome ? (largeHome ? 112 : 80) : 128}
-        height="106"
+        x={isHome ? (mansionHome ? -160 : estateHome ? -54 : largeHome ? -50 : -40) : -64}
+        y={mansionHome ? -130 : estateHome ? -80 : -59}
+        width={isHome ? (mansionHome ? 320 : estateHome ? 116 : largeHome ? 112 : 80) : 128}
+        height={mansionHome ? 292 : estateHome ? 132 : 106}
         rx="12"
       />
       {isHome && selected && (
         <g className="house-selection" pointerEvents="none" aria-hidden="true">
-          <rect className="house-selection-halo" x={largeHome ? -51 : -41} y={largeHome ? -65 : -54} width={largeHome ? 114 : 82} height={largeHome ? 105 : 94} rx="8" />
-          <rect className="house-selection-ring" x={largeHome ? -51 : -41} y={largeHome ? -65 : -54} width={largeHome ? 114 : 82} height={largeHome ? 105 : 94} rx="8" />
+          <rect className="house-selection-halo" x={mansionHome ? -160 : estateHome ? -55 : largeHome ? -51 : -41} y={mansionHome ? -130 : estateHome ? -81 : largeHome ? -65 : -54} width={mansionHome ? 320 : estateHome ? 118 : largeHome ? 114 : 82} height={mansionHome ? 292 : estateHome ? 134 : largeHome ? 105 : 94} rx="8" />
+          <rect className="house-selection-ring" x={mansionHome ? -160 : estateHome ? -55 : largeHome ? -51 : -41} y={mansionHome ? -130 : estateHome ? -81 : largeHome ? -65 : -54} width={mansionHome ? 320 : estateHome ? 118 : largeHome ? 114 : 82} height={mansionHome ? 292 : estateHome ? 134 : largeHome ? 105 : 94} rx="8" />
         </g>
       )}
-      {place.driveway && (
+      {estateHome && <EstateGarden />}
+      {place.driveway && !mansionHome && (
         <g className="home-driveway" aria-label="Side driveway with parking">
           <path className="driveway-paving" d={`M48 -12V${place.driveway.road_position.y - y}L${place.driveway.road_position.x - x} ${place.driveway.road_position.y - y}`} />
           <path className="driveway-parking" d="M37-10h22v44H37" />
@@ -461,6 +467,10 @@ function Building({
           <path className="park-bench" d="M-49 24h27m-27 5h27m-23 0v7m20-7v7" />
           <path className="flower-bed" d="M-51-28h23m-19 5h15" />
         </>
+      ) : mansionHome ? (
+        <Mansion place={place} />
+      ) : estateHome ? (
+        <EstateHome />
       ) : (
         <g className="illustrated-building">
           <ellipse className="house-shadow" cx="7" cy="30" rx={isHome ? 37 : 56} ry="9" />
@@ -496,8 +506,19 @@ function Building({
           )}
         </g>
       )}
-      {!isHome && (
-        <text className="place-name" x="0" y={isPark ? 65 : 56}>
+      {!isHome && !isPark && (
+        <path className="entrance-steps" aria-label="South-facing entrance" d="M-7 35h14m-14 5h14m-14 5h14" />
+      )}
+      {project && (
+        <g className="construction-site" aria-label={`House construction ${Math.round(project.worked_seconds / project.required_seconds * 100)}% complete`}>
+          <path className="construction-scaffold" d="M-39-48v84M31-48v84M-39-35h70M-39-10h70M-39 15h70M-39-35l70 50M31-35l-70 50" />
+          <path className="construction-barrier" d="M-40 40h68v9h-68z" />
+          <path className="construction-stripes" d="m-35 40 9 9m6-9 9 9m6-9 9 9m6-9 9 9" />
+          <text className="construction-progress" x="-5" y="63">{Math.round(project.worked_seconds / project.required_seconds * 100)}%</text>
+        </g>
+      )}
+      {(!isHome || mansionHome) && (
+        <text className="place-name" x="0" y={mansionHome ? 185 : isPark ? 65 : 56}>
           {place.name}
         </text>
       )}
@@ -505,8 +526,125 @@ function Building({
   );
 }
 
+function Mansion({ place }: { place: Place }) {
+  const roadY = (place.driveway?.road_position.y ?? place.position.y + 210) - place.position.y;
+  return (
+    <g className="mansion-estate" aria-label="Walled mansion with a vast garden and two parking spaces">
+      <rect className="mansion-lawn" x="-151" y="-121" width="302" height="272" rx="8" />
+      <path className="mansion-wall" d="M-155 155V-125H155V155" />
+      <path className="mansion-wall-cap" d="M-155-128H155M-158-125V155M158-125V155" />
+      <path className="mansion-garden-path" d="M-112-65Q-145 25-85 95Q-30 130 0 100M105-70Q142-15 113 22" />
+      <path className="mansion-driveway" d={`M0 ${roadY}V43M0 100H114M82 100V68M114 100V68`} />
+      <g className="mansion-parking" aria-label="Two driveway parking spaces">
+        <rect x="68" y="49" width="28" height="39" rx="2" />
+        <rect x="100" y="49" width="28" height="39" rx="2" />
+        <text x="82" y="73">P</text><text x="114" y="73">P</text>
+      </g>
+      <ellipse className="mansion-flower-bed" cx="-88" cy="109" rx="34" ry="11" />
+      <ellipse className="mansion-flower-bed" cx="87" cy="-89" rx="25" ry="9" />
+      {[-112, -100, -88, -76, -64].map((x, index) => <circle key={x} className={index % 2 ? "estate-flower estate-flower-gold" : "estate-flower"} cx={x} cy="107" r="3" />)}
+      <g className="mansion-fountain" transform="translate(-87 58)">
+        <ellipse className="fountain-basin" rx="28" ry="18" />
+        <ellipse className="fountain-water" cy="-2" rx="22" ry="13" />
+        <path className="fountain-jet" d="M0-3V-32M0-21q-12-12-16 2M0-21q12-12 16 2" />
+      </g>
+      {[[-123, -67], [123, -63], [-126, 130], [135, 133]].map(([x, y]) => (
+        <g key={`${x}:${y}`} transform={`translate(${x} ${y})`}>
+          <path className="estate-tree-trunk" d="M0 7V-12" />
+          <path className="estate-tree-crown" d="M-11-5Q-23-13-13-22Q-16-37 0-39Q17-39 14-24Q27-13 12-5Z" />
+        </g>
+      ))}
+      <path className="mansion-hedge" d="M-143-108H-98M-143-22V24M144-20V18M-136 142H-44M44 142H112" />
+      <g className="mansion-house">
+        <ellipse className="house-shadow" cy="34" rx="87" ry="14" />
+        <path className="mansion-wing" d="M-83-39H-40V32H-83ZM40-39H83V32H40Z" />
+        <path className="mansion-wing-roof" d="M-89-39L-61-66L-35-39ZM35-39L61-66L89-39Z" />
+        <path className="mansion-facade" d="M-43-70H43V34H-43Z" />
+        <path className="mansion-roof" d="M-51-70L-28-102H28L51-70Z" />
+        <path className="mansion-roof-lines" d="M-38-79H38M-32-89H32" />
+        <path className="mansion-dormer" d="M-12-78V-96L0-108L12-96V-78Z" />
+        <path className="mansion-dormer-roof" d="M-16-95L0-112L16-95" />
+        <path className="mansion-window" d="M-6-96H6V-82H-6ZM-31-57H-16V-35H-31ZM16-57H31V-35H16ZM-73-25H-59V-6H-73ZM59-25H73V-6H59ZM-73 6H-59V23H-73ZM59 6H73V23H59Z" />
+        <path className="mansion-window-bars" d="M0-96V-82M-6-89H6M-23-57V-35M-31-46H-16M23-57V-35M16-46H31M-66-25V-6M-73-16H-59M66-25V-6M59-16H73M-66 6V23M-73 15H-59M66 6V23M59 15H73" />
+        <path className="mansion-floor-trim" d="M-43-29H43M-83-1H-43M43-1H83" />
+        <path className="mansion-door" d="M-10 34V9Q0-3 10 9V34Z" />
+        <path className="mansion-door-trim" d="M-14 34V7Q0-9 14 7V34M0 8V34" />
+        <circle className="door-knob" cx="4" cy="22" r="1.3" />
+        <path className="mansion-porch-floor" d="M-32 31H32L37 41H-37Z" />
+        <path className="mansion-columns" d="M-27-13V32M-18-13V32M18-13V32M27-13V32" />
+        <path className="mansion-portico" d="M-37-13L0-36L37-13Z" />
+        <path className="mansion-portico-trim" d="M-26-18L0-29L26-18M-36-11H36" />
+        <path className="mansion-balustrade" d="M-83 27H-43M43 27H83M-78 27V33M-67 27V33M-56 27V33M56 27V33M67 27V33M78 27V33" />
+        <path className="estate-steps" d="M-19 44H19M-16 48H16" />
+      </g>
+      <path className="mansion-wall mansion-front-wall" d="M-155 155H-22M22 155H155" />
+      <path className="mansion-wall-cap" d="M-155 151H-22M22 151H155" />
+      <g className="mansion-gate" aria-label="South-facing driveway gate">
+        <path className="mansion-gate-pillar" d="M-29 144H-20V161H-29ZM20 144H29V161H20Z" />
+        <circle className="mansion-gate-finial" cx="-24.5" cy="141" r="4" />
+        <circle className="mansion-gate-finial" cx="24.5" cy="141" r="4" />
+        <path className="mansion-open-gate" d="M-20 146L-15 126V146L-20 158M20 146L15 126V146L20 158" />
+      </g>
+    </g>
+  );
+}
+
+function EstateGarden() {
+  return (
+    <g className="estate-garden" aria-label="Landscaped front garden" pointerEvents="none">
+      <path className="estate-lawn" d="M-51-17Q-52-23-45-23H29V27H35V46H-50Z" />
+      <path className="estate-garden-walk" d="M-7 32H7V48H-7Z" />
+      <path className="estate-hedge" d="M-49-9V38Q-49 44-43 44H-15M15 44H29" />
+      <path className="estate-flower-bed" d="M-39 36H-19M18 35H29" />
+      {[-36, -28, -20, 20, 28].map((x, index) => (
+        <g key={x} transform={`translate(${x} 35)`}>
+          <path className="estate-flower-stem" d="M0 3V-3" />
+          <circle className={index % 2 ? "estate-flower estate-flower-gold" : "estate-flower"} cy="-3" r="2.5" />
+        </g>
+      ))}
+      <path className="estate-tree-trunk" d="M-43 17V-1" />
+      <path className="estate-tree-crown" d="M-49 3Q-57-3-50-10Q-52-20-43-21Q-33-22-33-12Q-25-4-34 2Z" />
+    </g>
+  );
+}
+
+function EstateHome() {
+  return (
+    <g className="illustrated-building estate-house" aria-label="Two-storey country house with front porch">
+      <ellipse className="house-shadow" cx="-5" cy="30" rx="43" ry="9" />
+      <path className="estate-side" d="M27-31L35-40V22L27 30Z" />
+      <path className="estate-wall" d="M-43-34H27V30H-43Z" />
+      <path className="estate-wing" d="M-46-7H-25V29H-46Z" />
+      <path className="estate-roof-side" d="M-8-71L1-77L38-39L29-30Z" />
+      <path className="estate-roof" d="M-49-32L-8-71L32-32Z" />
+      <path className="estate-roof-lines" d="M-37-39H20M-28-48H11M-18-57H1" />
+      <path className="estate-wing-roof" d="M-49-7L-36-22L-22-7Z" />
+      <path className="estate-chimney" d="M16-49V-70H24V-41" />
+      <path className="estate-dormer" d="M-18-40V-53L-8-63L2-53V-40Z" />
+      <path className="estate-dormer-roof" d="M-21-52L-8-66L5-52" />
+      <path className="estate-window" d="M-13-53H-3V-42H-13ZM-34-24H-22V-8H-34ZM9-24H21V-8H9ZM-39 2H-29V17H-39ZM12 3H24V18H12Z" />
+      <path className="estate-window-bars" d="M-8-53V-42M-13-48H-3M-28-24V-8M-34-16H-22M15-24V-8M9-16H21M-34 2V17M-39 10H-29M18 3V18M12 11H24" />
+      <path className="estate-shutters" d="M-38-24V-8M-18-24V-8M5-24V-8M25-24V-8M-43 2V17M-25 2V17M8 3V18M28 3V18" />
+      <path className="estate-door" d="M-8 30V8Q0 1 8 8V30Z" />
+      <circle className="door-knob" cx="4" cy="19" r="1.2" />
+      <path className="estate-porch-floor" d="M-18 28H17L20 34H-21Z" />
+      <path className="estate-porch-columns" d="M-17 4V29M16 4V29" />
+      <path className="estate-porch-roof" d="M-23 5L-1-9L22 5Z" />
+      <path className="estate-porch-rail" d="M-18 21H-10M10 21H17M-14 21V28M13 21V28" />
+      <path className="estate-steps" d="M-10 36H10M-8 40H8" />
+    </g>
+  );
+}
+
 function BuildingFeature({ placeId }: { placeId: string }) {
   switch (placeId) {
+    case "place:bank":
+      return (
+        <g className="landmark landmark-bank" aria-hidden="true">
+          <path className="bank-front" d="M-24-8 0-25 24-8ZM-22 20h44M-20 16h40M-16-5v19M0-5v19M16-5v19" />
+          <text className="bank-sign" x="0" y="-9">€</text>
+        </g>
+      );
     case "place:clinic":
       return (
         <g className="landmark landmark-clinic" aria-hidden="true">
@@ -645,7 +783,10 @@ function EntitySprite({
   const workStyle = working ? workStyleFor(entity.role) : undefined;
   const x = entity.position.x + visualOffset.x;
   const y = entity.position.y + visualOffset.y;
-  const className = `map-entity ${entity.kind} palette-${entity.palette ?? "coral"} activity-${activity} ${selected || driverSelected ? "is-selected" : ""}`;
+  const vehiclePaint = entity.model === "sports"
+    ? (["ruby", "sapphire", "emerald", "amethyst", "champagne"].includes(entity.palette ?? "") ? entity.palette : "ruby")
+    : entity.palette ?? "coral";
+  const className = `map-entity ${entity.kind} palette-${vehiclePaint} activity-${activity} ${selected || driverSelected ? "is-selected" : ""}`;
   const visualStyle = {
     transform: `translate(${x}px, ${y}px)`,
     "--motion-delay": `${(-(seed + entity.id.length) % 21) * 0.13}s`,
@@ -686,7 +827,7 @@ function EntitySprite({
       ) : entity.kind === "pet" ? (
         <PetSprite activity={activity} />
       ) : (
-        <VehicleSprite driver={driver} heading={entity.heading ?? 0} highlighted={selected || driverSelected} onSelect={onSelect} />
+        <VehicleSprite sports={entity.model === "sports"} driver={driver} heading={entity.heading ?? 0} highlighted={selected || driverSelected} onSelect={onSelect} />
       )}
       {(selected || driverSelected) && (
         <text className="entity-label" y={entity.kind === "vehicle" ? -25 : -63 - badgeLift}>
@@ -986,9 +1127,30 @@ function PetSprite({ activity }: { activity: ActivityKind }) {
     </g>
   );
 }
-function VehicleSprite({ driver, heading, highlighted, onSelect }: { driver?: Entity; heading: number; highlighted: boolean; onSelect: Props["onSelect"] }) {
+function VehicleSprite({ sports, driver, heading, highlighted, onSelect }: { sports: boolean; driver?: Entity; heading: number; highlighted: boolean; onSelect: Props["onSelect"] }) {
   return (
-    <g className="vehicle-body" transform={`rotate(${heading})`}>
+    <g className={sports ? "vehicle-body sports-car-body" : "vehicle-body"} transform={`rotate(${heading})`}>
+      {sports ? (
+        <>
+          <rect className="entity-hit vehicle-hit" x="-27" y="-14" width="54" height="28" rx="8" />
+          {highlighted && <rect className="vehicle-selection-ring" x="-27" y="-14" width="54" height="28" rx="8" />}
+          <ellipse className="vehicle-shadow" cx="1" cy="2" rx="26" ry="11" />
+          <rect className="vehicle-wheel" x="-18" y="-12" width="9" height="5" rx="1" />
+          <rect className="vehicle-wheel" x="11" y="-11" width="8" height="4" rx="1" />
+          <rect className="vehicle-wheel" x="-18" y="7" width="9" height="5" rx="1" />
+          <rect className="vehicle-wheel" x="11" y="7" width="8" height="4" rx="1" />
+          <path className="vehicle-shell sports-car-shell" d="M-22-7Q-20-11-13-10L8-8Q20-7 25-2V2Q20 7 8 8L-13 10Q-20 11-22 7Z" />
+          <path className="vehicle-roof" d="M-9-6-2-6 6-4V4L-2 6H-9Q-12 0-9-6Z" />
+          <path className="vehicle-windshield" d="M4-6 10-5 12 0 10 5 4 6Q7 0 4-6Z" />
+          <path className="vehicle-rear-window" d="M-12-6-17-7-18 0-17 7-12 6Z" />
+          <path className="sports-car-spoiler" d="M-22-11h3v22h-3z" />
+          <path className="sports-car-vents" d="M-16-4v8m-3-7v6M13-4l5 1m-5 7 5-1" />
+          <path className="sports-car-highlight" d="M-11-8 7-6 19-3M-11 8 7 6 19 3" />
+          <path className="vehicle-lights" d="m21-5 2 2m-2 8 2-2" />
+          <path className="vehicle-tail-lights" d="M-22-6v3m0 6v3" />
+        </>
+      ) : (
+        <>
       <rect className="entity-hit vehicle-hit" x="-22" y="-14" width="44" height="28" rx="7" />
       {highlighted && <rect className="vehicle-selection-ring" x="-22" y="-14" width="44" height="28" rx="7" />}
       <ellipse className="vehicle-shadow" cx="1" cy="2" rx="20" ry="11" />
@@ -1003,6 +1165,8 @@ function VehicleSprite({ driver, heading, highlighted, onSelect }: { driver?: En
       <path className="vehicle-hood" d="M14-5v10" />
       <path className="vehicle-lights" d="M17-6h2M17 6h2" />
       <path className="vehicle-tail-lights" d="M-18-6h2M-18 6h2" />
+        </>
+      )}
       {driver ? (
         <g
           aria-label={`${driver.name} driving`}

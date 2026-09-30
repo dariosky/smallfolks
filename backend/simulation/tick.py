@@ -14,6 +14,22 @@ from simulation.economy import (
     record_regional_sales,
     reset_daily_sales,
 )
+from simulation.housing import home_parking_point
+from simulation.mansions import inside_mansion
+from simulation.prosperity import (
+    CAR_PRICE,
+    SPORTS_CAR_PRICE,
+    assign_construction,
+    buy_car,
+    car_purchase_available,
+    collect_loan_payments,
+    consider_prosperity,
+    ensure_prosperity,
+    purchase_affordable,
+    refresh_aspiration,
+    work_on_expansion,
+    workshop_parking,
+)
 from simulation.routing import (
     parking_point,
     pedestrian_route,
@@ -453,15 +469,12 @@ def _walk_pet_care_leg(
         # Care takes over the person's route; an interrupted commute must be
         # replanned from wherever the owner finishes the pet task.
         person.pop("direct_walk", None)
-        route = pedestrian_route(person["position"], _position_at(person, destination))
+        route = _residential_walk_route(world, person["position"], _position_at(person, destination))
         leg = {
             "owner_id": person["id"],
             "destination_id": destination["id"],
             "started_at_seconds": elapsed_seconds,
-            "duration_seconds": _walking_minutes(
-                {"position": person["position"]}, destination
-            )
-            * 60,
+            "duration_seconds": max(2, ceil(route_length(route) / WALKING_SPEED)) * 60,
             "route": route,
         }
         pet["care_leg"] = leg
@@ -632,6 +645,12 @@ def _move_to(
     person.pop("train_arrival_id", None)
 
 
+def _residential_walk_route(world: dict, start: dict, destination: dict) -> list[dict]:
+    if inside_mansion(world, start) or inside_mansion(world, destination):
+        return road_route(world["roads"], start, destination)
+    return pedestrian_route(start, destination)
+
+
 def _walk_from_current_position(
     world: dict,
     person: dict,
@@ -651,7 +670,7 @@ def _walk_from_current_position(
         route = (
             [origin, destination_position]
             if local
-            else pedestrian_route(origin, destination_position)
+            else _residential_walk_route(world, origin, destination_position)
         )
         walk = {
             "destination_id": destination["id"],
@@ -689,7 +708,7 @@ def _walk_from_current_position(
     return True
 
 
-def _car_journey(world: dict, person: dict, destination: dict) -> dict | None:
+def _car_journey(world: dict, person: dict, destination: dict, transport_required: bool = False) -> dict | None:
     """Choose the owner's reachable car only when the complete trip saves time."""
     start = {"position": person["position"]}
     walking_minutes = _walking_minutes(start, destination)
@@ -697,7 +716,7 @@ def _car_journey(world: dict, person: dict, destination: dict) -> dict | None:
         person["position"]["x"] - destination["position"]["x"],
         person["position"]["y"] - destination["position"]["y"],
     )
-    if direct_distance < 350 or walking_minutes < 25:
+    if not transport_required and (direct_distance < 350 or walking_minutes < 25):
         return None
     best = None
     for vehicle in world["vehicles"]:
@@ -708,9 +727,15 @@ def _car_journey(world: dict, person: dict, destination: dict) -> dict | None:
         ):
             continue
         try:
-            parked_at = (dict(destination["driveway"]["parking_position"])
+            parked_at = (home_parking_point(world, destination, vehicle["id"])
                          if destination.get("driveway")
                          else parking_point(world["roads"], destination["position"]))
+            if parked_at is None:
+                continue
+            if destination["id"] == "place:workshop":
+                parked_at = workshop_parking(world, vehicle["id"])
+                if parked_at is None:
+                    continue
             route = road_route(world["roads"], vehicle["position"], parked_at)
         except ValueError:
             continue
@@ -724,7 +749,7 @@ def _car_journey(world: dict, person: dict, destination: dict) -> dict | None:
             person["position"]["x"] - vehicle["position"]["x"],
             person["position"]["y"] - vehicle["position"]["y"],
         ) / WALKING_SPEED))
-        drive = max(2, ceil(route_length(route) / DRIVING_SPEED) + 1)
+        drive = max(2, ceil(route_length(route) / vehicle.get("speed_units_per_minute", DRIVING_SPEED)) + 1)
         arrival_position = _position_at(person, destination)
         egress = max(2, ceil(hypot(
             parked_at["x"] - arrival_position["x"],
@@ -736,7 +761,7 @@ def _car_journey(world: dict, person: dict, destination: dict) -> dict | None:
             "parking_position": parked_at, "road_route": route,
             "drive_seconds": drive * 60, "minutes": total,
         }
-        if total + 5 < walking_minutes and (best is None or total < best["minutes"]):
+        if (transport_required or total + 5 < walking_minutes) and (best is None or total < best["minutes"]):
             best = candidate
     return best
 
@@ -1282,6 +1307,7 @@ def advance_seconds(world: dict, seconds: int) -> dict:
 
 def _advance_step(world: dict, seconds: int) -> dict:
     ensure_economy(world)
+    ensure_prosperity(world)
     previous = datetime.fromisoformat(world["clock"])
     now = previous + timedelta(seconds=seconds)
     world["clock"] = now.isoformat(timespec="seconds")
@@ -1311,8 +1337,12 @@ def _advance_step(world: dict, seconds: int) -> dict:
         reset_daily_sales(world, now)
         charge_daily_overhead(world, now)
         pay_owner_dividends(world, now)
+        collect_loan_payments(world, now)
     if seconds and now.hour == 9 and now.minute == 0 and now.second == 0:
         consider_takeovers(world, now)
+    if seconds:
+        consider_prosperity(world, now)
+        assign_construction(world)
     pippin = world["pets"][0]
     _ensure_pet_walk_contract(world, pippin, now)
     _update_pet_walk_need(pippin, now)
@@ -1339,6 +1369,52 @@ def _advance_step(world: dict, seconds: int) -> dict:
             continue
         if person.get("train_trip"):
             _run_train_trip(world, person, now, train_state)
+            continue
+        if person.get("vehicle_purchase") and 9 * 60 <= current_minutes < 20 * 60:
+            model = person["vehicle_purchase"]["model"]
+            cost = SPORTS_CAR_PRICE if model == "sports" else CAR_PRICE
+            if (not car_purchase_available(world, person, model)
+                    or household["food_servings"] < len(household["member_ids"])
+                    or household["money_cents"] < 5_000
+                    or not purchase_affordable(world, person, cost, now)):
+                person.pop("vehicle_purchase", None)
+                refresh_aspiration(world, person)
+            else:
+                shop = _place(world, "place:workshop")
+                existing = next((v for v in world["vehicles"] if v["owner_id"] == person["id"]), None)
+                if existing and existing.get("parking_place_id") != shop["id"]:
+                    trip = _car_journey(world, person, shop, transport_required=True)
+                    if trip:
+                        _start_car_trip(world, person, trip)
+                    continue
+                if not _at_place(person, shop):
+                    _walk_from_current_position(world, person, shop, "Buy a car at the workshop",
+                                                "Walking to the workshop to buy a car",
+                                                "This resident is visiting the workshop for their chosen car.")
+                elif buy_car(world, person, home, now, model):
+                    refresh_aspiration(world, person)
+                    trip = _car_journey(world, person, home, transport_required=True)
+                    if trip:
+                        _start_car_trip(world, person, trip)
+                else:
+                    person["activity"] = "Waiting to buy a car at the workshop"
+                    person["explanation"] = "Workshop parking must be available before the purchase can complete."
+                continue
+        project = next((project for project in world["construction_projects"]
+                        if project["worker_id"] == person["id"] and project["status"] == "building"), None)
+        if project and 9 * 60 <= current_minutes < 17 * 60:
+            site = _place(world, project["home_place_id"])
+            if not _at_place(person, site):
+                _walk_from_current_position(
+                    world, person, site, "Build the house upgrade", f"Walking to build at {site['name']}",
+                    "A paid construction contract requires the carpenter to reach the house first.",
+                )
+            elif _is_meal_time(current_minutes) and person["needs"].get("hunger", 0) >= MEAL_WINDOW_HUNGER_THRESHOLD:
+                _eat_lunch_at_work(person, site, now)
+            else:
+                _move_to(person, site, "Working on a house expansion", "This carpenter is completing a paid building contract.", "Finish the home and driveway")
+                if seconds:
+                    work_on_expansion(world, person, project, seconds, now)
             continue
         if _is_bedtime(current_minutes) and not shift_start <= current_minutes < shift_end:
             if _at_place(person, home):
