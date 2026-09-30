@@ -11,6 +11,17 @@
   align-items: end;
   margin-bottom: 1.5rem;
 }
+.town-brand {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+.town-brand img {
+  display: block;
+  flex: none;
+  width: clamp(7rem, 14vw, 10rem);
+  height: auto;
+}
 .town-header h1 {
   font-family: Georgia, serif;
   font-size: clamp(3rem, 7vw, 5.5rem);
@@ -118,13 +129,10 @@
   stroke: #fffaf0;
   stroke-width: 3;
 }
-.map-entity.vehicle rect {
-  fill: #e67868;
-  stroke: #fffaf0;
-  stroke-width: 2;
-}
-.map-entity.pet circle {
-  fill: #6f4f39;
+.map-entity.pet .pet-head {
+  fill: #ad7549;
+  stroke: #67422d;
+  stroke-width: 1.5;
 }
 .map-entity.is-selected circle,
 .map-entity.is-selected rect {
@@ -546,24 +554,8 @@
   stroke: #67422d;
   stroke-width: 1.5;
 }
-.vehicle-body rect {
-  fill: #d66c5c;
-  stroke: #7d3d38;
-  stroke-width: 1.5;
-}
-.vehicle-body path {
-  fill: #b8dce2;
-  stroke: #5b7c82;
-  stroke-width: 1.2;
-}
-.vehicle-body circle {
-  fill: #37434b;
-  stroke: #f4e9d9;
-  stroke-width: 1;
-}
 .map-entity.is-selected .person-head,
 .map-entity.is-selected .person-torso,
-.map-entity.is-selected .vehicle-body rect,
 .map-entity.is-selected .pet-body {
   stroke: #203f6a;
   stroke-width: 3;
@@ -939,25 +931,27 @@
   }
 }
 
+@media (max-width: 600px) {
+  .town-brand {
+    gap: 0.65rem;
+  }
+  .town-brand img {
+    width: 5.5rem;
+  }
+  .town-header h1 {
+    font-size: 2rem;
+  }
+}
+
 #root {
   min-height: 100vh;
 }
 
-.page-shell,
 .dashboard-shell {
   min-height: 100vh;
   padding: 3rem 1.25rem;
 }
 
-.page-shell {
-  display: grid;
-  gap: 1.5rem;
-  align-items: center;
-  max-width: 1180px;
-  margin: 0 auto;
-}
-
-.hero-copy,
 .auth-card,
 .panel,
 .dashboard-header {
@@ -965,32 +959,6 @@
   border: 1px solid var(--line);
   box-shadow: var(--shadow);
   backdrop-filter: blur(12px);
-}
-
-.hero-copy {
-  padding: 2rem;
-  border-radius: var(--radius-lg);
-}
-
-.hero-copy h1 {
-  margin: 0;
-  font-size: clamp(2.8rem, 7vw, 5.4rem);
-  line-height: 0.95;
-}
-
-.hero-description {
-  max-width: 34rem;
-  margin: 1.25rem 0 0;
-  color: var(--muted);
-  font-size: 1.1rem;
-}
-
-.hero-points {
-  margin: 1.5rem 0 0;
-  padding-left: 1.25rem;
-  color: var(--muted);
-  display: grid;
-  gap: 0.55rem;
 }
 
 .auth-card {
@@ -1191,10 +1159,6 @@ code {
 }
 
 @media (min-width: 900px) {
-  .page-shell {
-    grid-template-columns: minmax(0, 1.1fr) minmax(24rem, 26rem);
-  }
-
   .dashboard-header {
     grid-template-columns: auto 1fr auto;
   }

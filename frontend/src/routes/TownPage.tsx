@@ -177,9 +177,12 @@ export function TownPage() {
   return (
     <main className="town-shell">
       <header className="town-header">
-        <div>
-          <h1>SmallFolks</h1>
-          <p>A connected town with lives in motion.</p>
+        <div className="town-brand">
+          <img src="/smallfolks.png" alt="" width="1447" height="1087" />
+          <div>
+            <h1>SmallFolks</h1>
+            <p>A connected town with lives in motion.</p>
+          </div>
         </div>
         <div className="clock">
           <span>{world ? displayTime(world.clock) : "Loading town…"}</span>
@@ -251,6 +254,17 @@ export function TownPage() {
                   {selectedEntity.train_trip ? (
                     <p>
                       <strong>Train trip:</strong> {selectedEntity.train_trip.phase} · {selectedEntity.train_trip.departure_id.replace("station:", "")} to {selectedEntity.train_trip.arrival_id.replace("station:", "")}
+                    </p>
+                  ) : null}
+                  {selectedEntity.car_trip ? (
+                    <p>
+                      <strong>Car trip:</strong> {selectedEntity.car_trip.phase} · {world?.vehicles.find((vehicle) => vehicle.id === selectedEntity.car_trip?.vehicle_id)?.name ?? selectedEntity.car_trip.vehicle_id} to {world?.places.find((place) => place.id === selectedEntity.car_trip?.destination_id)?.name ?? selectedEntity.car_trip.destination_id}
+                    </p>
+                  ) : null}
+                  {selectedEntity.kind === "vehicle" ? (
+                    <p>
+                      <strong>Owner:</strong> {world?.people.find((person) => person.id === selectedEntity.owner_id)?.name ?? "unknown"}
+                      {selectedEntity.driver_id ? ` · Driven by ${world?.people.find((person) => person.id === selectedEntity.driver_id)?.name ?? selectedEntity.driver_id}` : selectedEntity.reserved_by ? ` · Reserved by ${world?.people.find((person) => person.id === selectedEntity.reserved_by)?.name ?? selectedEntity.reserved_by}` : " · Available"}
                     </p>
                   ) : null}
                   {selectedEntity.needs ? (

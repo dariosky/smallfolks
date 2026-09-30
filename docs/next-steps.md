@@ -128,7 +128,8 @@ Preserve the user's current direction: strict top-down, detailed cartoon art, bu
 - Train access and egress use the normal walking speed. A commuter remains on the final local station leg after the nominal shift time instead of being snapped to work.
 - The 2026-09-30 station pass adds persisted FIFO queues, 15-second boarding slots, alight-before-board, eight explicit stable seats, later-service overflow recovery, selectable station/train inspectors, and open-door cues. A ten-person isolated scenario fills eight seats, leaves two queued, then boards those two on the next Market Square service; save/reload preserves the queue and occupied seats. Empty and loaded trains share the same timetable position.
 - Folk Loop now completes its last loop at Market Square at midnight, remains parked with doors closed until 06:00, and advertises the next valid departure. Trip choice includes access, timetable wait, ride and egress; a queued resident sees the earliest work ETA and lateness. New fixtures use simulation version `poc-3`; old snapshots gain additive track/station metadata without replacing their identity.
-- Step 2 remains open for browser continuity and queue/platform visual acceptance, plus replanning queued trips when walking becomes preferable. The backend rail geometry now supplies the rendered track and coach position, while timetable segment durations are still explicit values rather than derived from graph edges.
+- Queue order now appears as numbered markers beside each platform. After a missed boarding window, residents compare the next train's earliest arrival with walking from their current position; they leave the queue and walk if that saves more than four minutes. Residents for whom the next train remains useful stay in FIFO order for the later service. The inspector labels the next scheduled departure as seat-dependent. Browser continuity and physical platform access still need acceptance work.
+- Step 2 remains open for browser continuity and queue/platform visual acceptance. The backend rail geometry now supplies the rendered track and coach position, while timetable segment durations are still explicit values rather than derived from graph edges.
 
 ## Step 3 — connected town geometry and trustworthy journey estimates
 
@@ -198,7 +199,7 @@ Preserve the user's current direction: strict top-down, detailed cartoon art, bu
 
 - [ ] Add explicit home/business/vehicle ownership, integer-valued money accounts and balanced ledger transactions. Seed initial ownership, balances and stock.
 - [ ] Pay wages once per defined earning event; purchases transfer money and inventory atomically and idempotently. No funds/stock means a different valid decision, not a fabricated purchase.
-- [ ] Treat a car as an available, reachable asset: walk to parking, acquire exclusive use, drive on the road graph, park and walk to the destination.
+- [x] Treat a car as an available, reachable asset: walk to parking, acquire exclusive use, drive on the road graph, park and walk to the destination.
 - [ ] Add simple junction/crossing queues and parking capacity, without full driving physics. Compare car travel honestly against walking and transit.
 
 **Done when:** a resident earns and spends money, food stock changes consistently, and two people cannot simultaneously drive one vehicle. A complete visible car trip starts and ends at valid parking.
@@ -216,6 +217,12 @@ Preserve the user's current direction: strict top-down, detailed cartoon art, bu
 - Each business has a saved unit price. Higher prices reduce expected customer count; the current price affects grocery, bar and cinema payments as well as wider-town sales. A resident can take over a closed business by paying its recorded unpaid bills and investing €80, then choosing a price. At 09:00, an affordable resident may also choose an economically viable takeover, preferring former employees. The business reopens with an owner, and retained profits can pay a weekly dividend after a two-day expense reserve.
 - Closed workers are marked out of work and look for a next step during ordinary home time. The previous closure records lacked exact debt claims, so they receive one conservative legacy unpaid bill inferred from the closure event; new closures record the exact creditor and amount. The saved `poc-9` gardener assignment to the park also upgrades to Fern Florist without moving Bruno's current position.
 - This is a compact fixture demand model, not a detailed supply chain or a guarantee that every price and staffing choice is profitable. Browser continuity, broader generation, inventory, business ownership contracts and full job mobility remain open.
+
+### Car travel progress (2026-09-30)
+
+- The existing cars now belong to Lea and Lucas as drivable assets. For a distant work or evening destination, an owner compares walking, train service where relevant, and a complete car trip. The car trip reserves the vehicle, walks from the resident's actual position to parking, drives through connected road segments, parks near the destination, and walks the last leg. A car at work can be used for the return home; short trips stay on foot.
+- Vehicle and driver positions, route progress, reservation, and the current trip phase persist through save/reload. The map shows the moving car with its driver inside using a rotatable top-down sprite with wheels on both sides; the inspectors show the owner, reservation, driver, and trip phase. New fixtures use `poc-4`; older snapshots keep their version and gain trip fields only when a car is used.
+- This completes the basic exclusive car workflow. Junction queues, shared household borrowing, explicit parking capacities, road traffic, and browser visual acceptance remain open.
 
 ## Step 8 — individual lives and small stories
 
@@ -267,7 +274,7 @@ Run relevant backend checks and frontend type/lint/build for each affected slice
 
 ## Recommended next implementation
 
-1. Run step 2's browser acceptance: ten-person crowd, visible platform positions, open doors, stable coach seats, overflow's later boarding, midnight stop and 06:00 restart. Correct any visual discontinuity, then make queued-trip replanning explicit.
+1. Run step 2's browser acceptance: ten-person crowd, visible platform positions, open doors, stable coach seats, overflow's later boarding or walking replan, midnight stop and 06:00 restart. Correct any visual discontinuity.
 2. Unify the remaining train and pedestrian legs into one journey executor, including route continuity for corners, pause and delayed observations.
 3. Convert the step 4 prototype slices into typed commitments/activities with explicit duration, opening hours and effects. Preserve household food and dog-care behaviour while making it reproducible and inspectable.
 4. Run the first browser acceptance pass from step 5: pause/resume, a full train trip, social/cinema outing, dog walk, large manual advance and two-tab observation. Record any remaining visual discontinuity before expanding generation or economy.

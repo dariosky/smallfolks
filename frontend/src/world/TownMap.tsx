@@ -93,6 +93,7 @@ export function TownMap({ world, selectedId, onSelect }: Props) {
       <TrainLoop
         onSelect={onSelect}
         passengers={trainPassengers}
+        people={world.people}
         queues={world.station_queues ?? []}
         seed={world.seed}
         train={world.trains?.[0]}
@@ -115,7 +116,7 @@ export function TownMap({ world, selectedId, onSelect }: Props) {
       <TownDetails />
       {(() => {
         const visible = [
-          ...world.people.filter((person) => !person.on_train),
+          ...world.people.filter((person) => !person.on_train && !person.in_vehicle_id),
           ...world.pets,
           ...world.vehicles,
         ].sort((a, b) => a.position.y - b.position.y);
@@ -133,6 +134,8 @@ export function TownMap({ world, selectedId, onSelect }: Props) {
           return (
             <EntitySprite
               entity={entity}
+              driver={entity.kind === "vehicle" ? world.people.find((person) => person.id === entity.driver_id) : undefined}
+              driverSelected={entity.kind === "vehicle" && entity.driver_id === selectedId}
               key={entity.id}
               onSelect={onSelect}
               selected={entity.id === selectedId}
@@ -168,12 +171,14 @@ export function TownMap({ world, selectedId, onSelect }: Props) {
 function TrainLoop({
   train,
   passengers,
+  people,
   queues,
   onSelect,
   seed,
 }: {
   train?: Train;
   passengers: Entity[];
+  people: Entity[];
   queues: NonNullable<World["station_queues"]>;
   onSelect: Props["onSelect"];
   seed: number;
@@ -189,10 +194,11 @@ function TrainLoop({
       <polyline className="rail-ties" fill="none" points={loop} />
       <polyline className="rail-line" fill="none" points={loop} />
       {stations.map((station) => {
-        const waiting = queues.find((queue) => queue.station_id === station.id)?.entries.length ?? 0;
+        const entries = queues.find((queue) => queue.station_id === station.id)?.entries ?? [];
+        const horizontal = station.platform.width > station.platform.height;
         return (
           <g
-            aria-label={`${station.name}, ${waiting} waiting`}
+            aria-label={`${station.name}, ${entries.length} waiting`}
             className="station"
             key={station.id}
             onClick={() => onSelect({ ...station, kind: "station" })}
@@ -203,7 +209,23 @@ function TrainLoop({
           >
             <rect {...station.platform} rx="3" />
             <text y={station.platform.y - 6}>{station.name.toUpperCase()}</text>
-            {waiting ? <text className="station-queue-count" y={station.platform.y + station.platform.height + 16}>{waiting} waiting</text> : null}
+            {entries.map((entry, index) => {
+              const person = people.find((resident) => resident.id === entry.person_id);
+              const x = horizontal
+                ? station.platform.x + 9 + (index % 10) * 15
+                : station.platform.x + station.platform.width + 10 + Math.floor(index / 10) * 15;
+              const y = horizontal
+                ? station.platform.y + station.platform.height + 8 + Math.floor(index / 10) * 15
+                : station.platform.y + 9 + (index % 10) * 15;
+              return (
+                <g className="station-queue-place" key={entry.person_id} transform={`translate(${x} ${y})`}>
+                  <title>{`${index + 1}. ${person?.name ?? entry.person_id} in boarding queue`}</title>
+                  <circle r="6" />
+                  <text textAnchor="middle" y="2">{index + 1}</text>
+                </g>
+              );
+            })}
+            {entries.length ? <text className="station-queue-count" y={station.platform.y + station.platform.height + (horizontal ? 34 : 16)}>{entries.length} waiting</text> : null}
           </g>
         );
       })}
@@ -373,6 +395,7 @@ function Building({
   const { x, y } = place.position;
   const isHome = place.kind === "home";
   const isPark = place.kind === "park";
+  const largeHome = isHome && place.house_style === "large";
   const variant = [...place.id].reduce((sum, letter) => sum + letter.charCodeAt(0), 0) % 5;
   return (
     <g
@@ -388,16 +411,22 @@ function Building({
       <title>{place.name}</title>
       <rect
         className="place-hit"
-        x={isHome ? -40 : -64}
+        x={isHome ? (largeHome ? -50 : -40) : -64}
         y="-59"
-        width={isHome ? 80 : 128}
+        width={isHome ? (largeHome ? 112 : 80) : 128}
         height="106"
         rx="12"
       />
       {isHome && selected && (
         <g className="house-selection" pointerEvents="none" aria-hidden="true">
-          <rect className="house-selection-halo" x="-41" y="-54" width="82" height="94" rx="8" />
-          <rect className="house-selection-ring" x="-41" y="-54" width="82" height="94" rx="8" />
+          <rect className="house-selection-halo" x={largeHome ? -51 : -41} y={largeHome ? -65 : -54} width={largeHome ? 114 : 82} height={largeHome ? 105 : 94} rx="8" />
+          <rect className="house-selection-ring" x={largeHome ? -51 : -41} y={largeHome ? -65 : -54} width={largeHome ? 114 : 82} height={largeHome ? 105 : 94} rx="8" />
+        </g>
+      )}
+      {place.driveway && (
+        <g className="home-driveway" aria-label="Side driveway with parking">
+          <path className="driveway-paving" d={`M48 -12V${place.driveway.road_position.y - y}L${place.driveway.road_position.x - x} ${place.driveway.road_position.y - y}`} />
+          <path className="driveway-parking" d="M37-10h22v44H37" />
         </g>
       )}
       {isPark ? (
@@ -413,7 +442,7 @@ function Building({
       ) : (
         <g className="illustrated-building">
           <ellipse className="house-shadow" cx="7" cy="30" rx={isHome ? 37 : 56} ry="9" />
-          <g transform={isHome ? undefined : "scale(1.42 1.12)"}>
+          <g transform={isHome ? (largeHome ? "translate(-8 -5) scale(1.12 1.15)" : undefined) : "scale(1.42 1.12)"}>
             <path className="house-side" d="M28-11l10-10v43L28 31Z" />
             <path className="house-wall" d="M-30-13L28-12V31L-29 30Z" />
             <path className="house-roof-side" d="M-3-51 9-57 41-21 29-11Z" />
@@ -440,7 +469,7 @@ function Building({
           {isHome && (
             <path
               className="little-fence"
-              d="M-38 24v15m8-15v15m8-15v15m-18-10h21m40 0h17m-14-5v15m10-15v15"
+              d={largeHome ? "M-46 24v15m8-15v15m8-15v15m-18-10h21" : "M-38 24v15m8-15v15m8-15v15m-18-10h21m40 0h17m-14-5v15m10-15v15"}
             />
           )}
         </g>
@@ -571,6 +600,8 @@ function BuildingFeature({ placeId }: { placeId: string }) {
 
 function EntitySprite({
   entity,
+  driver,
+  driverSelected,
   onSelect,
   selected,
   seed,
@@ -578,6 +609,8 @@ function EntitySprite({
   badgeLift,
 }: {
   entity: Entity;
+  driver?: Entity;
+  driverSelected: boolean;
   onSelect: Props["onSelect"];
   selected: boolean;
   seed: number;
@@ -590,7 +623,7 @@ function EntitySprite({
   const workStyle = working ? workStyleFor(entity.role) : undefined;
   const x = entity.position.x + visualOffset.x;
   const y = entity.position.y + visualOffset.y;
-  const className = `map-entity ${entity.kind} activity-${activity} ${selected ? "is-selected" : ""}`;
+  const className = `map-entity ${entity.kind} palette-${entity.palette ?? "coral"} activity-${activity} ${selected || driverSelected ? "is-selected" : ""}`;
   const visualStyle = {
     transform: `translate(${x}px, ${y}px)`,
     "--motion-delay": `${(-(seed + entity.id.length) % 21) * 0.13}s`,
@@ -615,9 +648,9 @@ function EntitySprite({
       tabIndex={0}
       transform={`translate(${x} ${y})`}
     >
-      <circle className="entity-hit" r="25" />
-      {selected && <ellipse className="selection-ring" cy="13" rx="19" ry="9" />}
-      <ellipse className="entity-shadow" cy="14" rx={entity.kind === "vehicle" ? 17 : 9} ry="3" />
+      {entity.kind !== "vehicle" && <circle className="entity-hit" r="25" />}
+      {entity.kind !== "vehicle" && (selected || driverSelected) && <ellipse className="selection-ring" cy="13" rx="19" ry="9" />}
+      {entity.kind !== "vehicle" && <ellipse className="entity-shadow" cy="14" rx="9" ry="3" />}
       {entity.kind === "person" && appearance ? (
         <>
           <PersonSprite
@@ -631,11 +664,11 @@ function EntitySprite({
       ) : entity.kind === "pet" ? (
         <PetSprite activity={activity} />
       ) : (
-        <VehicleSprite />
+        <VehicleSprite driver={driver} heading={entity.heading ?? 0} highlighted={selected || driverSelected} onSelect={onSelect} />
       )}
-      {selected && (
-        <text className="entity-label" y={-63 - badgeLift}>
-          {entity.name.split(" ")[0]}
+      {(selected || driverSelected) && (
+        <text className="entity-label" y={entity.kind === "vehicle" ? -25 : -63 - badgeLift}>
+          {driverSelected ? driver?.name.split(" ")[0] : entity.name.split(" ")[0]}
         </text>
       )}
     </g>
@@ -916,7 +949,7 @@ function PetSprite({ activity }: { activity: ActivityKind }) {
   return (
     <g className="pet-body">
       <ellipse cx="0" cy="3" rx="9" ry="5" />
-      <circle cx="8" cy="0" r="4" />
+      <circle className="pet-head" cx="8" cy="0" r="4" />
       <path d="m10-4 3-4 1 5M-5 6v5M5 6v5" />
       <path className="pet-tail" d="M-8 4q-9-1-7-8" />
       {activity === "rest" && (
@@ -931,13 +964,38 @@ function PetSprite({ activity }: { activity: ActivityKind }) {
     </g>
   );
 }
-function VehicleSprite() {
+function VehicleSprite({ driver, heading, highlighted, onSelect }: { driver?: Entity; heading: number; highlighted: boolean; onSelect: Props["onSelect"] }) {
   return (
-    <g className="vehicle-body">
-      <rect height="13" rx="4" width="28" x="-14" y="-5" />
-      <path d="M-7-5-2-10h10l6 5z" />
-      <circle cx="-8" cy="8" r="3" />
-      <circle cx="8" cy="8" r="3" />
+    <g className="vehicle-body" transform={`rotate(${heading})`}>
+      <rect className="entity-hit vehicle-hit" x="-22" y="-14" width="44" height="28" rx="7" />
+      {highlighted && <rect className="vehicle-selection-ring" x="-22" y="-14" width="44" height="28" rx="7" />}
+      <ellipse className="vehicle-shadow" cx="1" cy="2" rx="20" ry="11" />
+      <rect className="vehicle-wheel" x="-14" y="-12" width="8" height="5" rx="1" />
+      <rect className="vehicle-wheel" x="8" y="-12" width="8" height="5" rx="1" />
+      <rect className="vehicle-wheel" x="-14" y="7" width="8" height="5" rx="1" />
+      <rect className="vehicle-wheel" x="8" y="7" width="8" height="5" rx="1" />
+      <path className="vehicle-shell" d="M-17-8Q-19-7-19-4v8q0 3 2 4h30q6 0 7-5V-3q-1-5-7-5Z" />
+      <rect className="vehicle-roof" x="-9" y="-6" width="18" height="12" rx="4" />
+      <path className="vehicle-windshield" d="M7-5q5 0 6 5-1 5-6 5Z" />
+      <path className="vehicle-rear-window" d="M-9-5q-4 1-5 5 1 4 5 5Z" />
+      <path className="vehicle-hood" d="M14-5v10" />
+      <path className="vehicle-lights" d="M17-6h2M17 6h2" />
+      <path className="vehicle-tail-lights" d="M-18-6h2M-18 6h2" />
+      {driver ? (
+        <g
+          aria-label={`${driver.name} driving`}
+          className="vehicle-driver"
+          onClick={(event) => { event.stopPropagation(); onSelect(driver); }}
+          onKeyDown={(event) => { event.stopPropagation(); activate(event, () => onSelect(driver)); }}
+          role="button"
+          tabIndex={0}
+          transform={`rotate(${-heading})`}
+        >
+          <circle className="vehicle-driver-hit" r="8" />
+          <circle className="vehicle-driver-head" r="4" />
+          <text textAnchor="middle" y="2">{driver.name.charAt(0)}</text>
+        </g>
+      ) : null}
     </g>
   );
 }

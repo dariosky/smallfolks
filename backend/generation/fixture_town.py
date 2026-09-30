@@ -2,11 +2,12 @@ from copy import deepcopy
 
 from generation.validators import validate_place_layout
 from simulation.economy import ensure_economy
+from simulation.housing import ensure_home_parking
 from simulation.tick import STATIONS, rail_track
 from simulation.versions import WORLD_FORMAT_VERSION
 
 GENERATION_VERSION = "poc-9"
-SIMULATION_VERSION = "poc-3"
+SIMULATION_VERSION = "poc-4"
 
 PEOPLE = [
     ("person:elena", "Elena Rossi", "place:rowan-1", "place:bakery", "Baker", "baker"),
@@ -319,6 +320,7 @@ def build_fixture(seed: int) -> dict:
             {"at": "07:30", "summary": "Bruno is due to walk Pippin in Mossy Common."},
         ],
     }
+    ensure_home_parking(world)
     ensure_economy(world)
     return world
 

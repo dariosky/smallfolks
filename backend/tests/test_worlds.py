@@ -1,5 +1,6 @@
 import json
 from datetime import datetime, timedelta
+from itertools import pairwise
 from math import ceil, hypot
 
 from fastapi.testclient import TestClient
@@ -23,6 +24,7 @@ from simulation.economy import (
 )
 from simulation.tick import (
     STATIONS,
+    _car_journey,
     _grocery_browsing_minutes,
     _is_business_open_and_staffed,
     _next_service,
@@ -261,13 +263,20 @@ def test_ten_person_platform_fills_eight_seats_then_recovers_on_next_service():
     world = build_fixture(781)
     empty = build_fixture(782)
     station = STATIONS["market"]
+    world["places"].append({
+        "id": "place:far-east-work", "name": "Far East Work",
+        "kind": "workplace", "position": {"x": 1200, "y": 500},
+    })
     crowd = world["people"][:10]
     for person in crowd:
         _start_at(person, station)
         person["train_trip"] = {
             "departure_id": station["id"],
             "arrival_id": STATIONS["eastgate"]["id"],
-            "destination_id": person["workplace_id"],
+            "destination_id": (
+                "place:far-east-work" if person["id"] in {"person:sofia", "person:tom"}
+                else person["workplace_id"]
+            ),
             "phase": "access",
         }
 
@@ -281,6 +290,10 @@ def test_ten_person_platform_fills_eight_seats_then_recovers_on_next_service():
     assert world["trains"][0]["state"]["distance"] == empty["trains"][0]["state"]["distance"]
     assert len(world["trains"][0]["state"]["passenger_ids"]) == 8
     assert len(queue["entries"]) == 2
+    assert all(
+        "next scheduled departure is 08:18" in person["explanation"]
+        for person in crowd if person["id"] in {"person:sofia", "person:tom"}
+    )
     seats = {(person["train_car_id"], person["train_seat_id"]) for person in crowd if person.get("on_train")}
     assert len(seats) == 8
     assert all(len(carriage["seats"]) == 4 for carriage in world["trains"][0]["state"]["carriages"])
@@ -297,6 +310,30 @@ def test_ten_person_platform_fills_eight_seats_then_recovers_on_next_service():
     advance(restored, 35)
     assert len(restored_queue["entries"]) == 0
     assert sum(bool(person.get("on_train")) for person in restored["people"]) == 2
+
+
+def test_a_missed_train_causes_a_faster_walk_from_the_actual_platform():
+    world = build_fixture(786)
+    station = STATIONS["market"]
+    for person in world["people"][:10]:
+        _start_at(person, station)
+        person["train_trip"] = {
+            "departure_id": station["id"],
+            "arrival_id": STATIONS["eastgate"]["id"],
+            "destination_id": person["workplace_id"],
+            "phase": "access",
+        }
+
+    advance(world, 3)
+    queue = next(item for item in world["station_queues"] if item["station_id"] == station["id"])
+    assert queue["entries"] == []
+    walkers = [
+        person for person in world["people"][:10]
+        if person.get("direct_walk") and not person.get("train_trip")
+    ]
+    assert len(walkers) == 2
+    assert all(person["direct_walk"]["route"][0] == _position_at(person, station) for person in walkers)
+    assert all(not person.get("train_trip") for person in walkers)
 
 
 def test_alighting_frees_seats_before_fifo_boarding_at_the_same_station():
@@ -348,6 +385,7 @@ def test_overnight_layover_closes_doors_and_resumes_at_six():
         "phase": "access",
     }
     advance(world, 0)
+    rider["train_trip"]["missed_service_at"] = "2031-05-12T23:17:45"
     advance_seconds(world, 15)
     state = world["trains"][0]["state"]
     assert state["service_state"] == "parked"
@@ -394,6 +432,83 @@ def test_timetable_never_promises_an_overnight_departure():
     morning = _train_journey(origin, workplace, datetime.fromisoformat("2031-05-13T05:50:00"))
     assert morning is not None
     assert morning["departure_at"] == "2031-05-13T06:03:00"
+
+
+def test_distant_commuters_walk_to_owned_cars_drive_roads_and_park_before_work():
+    world = build_fixture(787)
+    lea = next(person for person in world["people"] if person["id"] == "person:lea")
+    lucas = next(person for person in world["people"] if person["id"] == "person:lucas")
+    near = next(place for place in world["places"] if place["id"] == "place:rowan-2")
+    assert _car_journey(world, lea, near) is None
+
+    advance(world, 0)
+    assert lea["car_trip"]["phase"] == "access"
+    assert lucas["car_trip"]["phase"] == "access"
+    assert next(vehicle for vehicle in world["vehicles"] if vehicle["id"] == "vehicle:lea")["reserved_by"] == lea["id"]
+    work = next(place for place in world["places"] if place["id"] == lea["workplace_id"])
+    assert _car_journey(world, lea, work) is None
+
+    advance(world, 8)
+    car = next(vehicle for vehicle in world["vehicles"] if vehicle["id"] == "vehicle:lea")
+    assert car["state"] == "driving"
+    assert car["driver_id"] == lea["id"]
+    assert car["heading"] == 90
+    assert lea["in_vehicle_id"] == car["id"]
+    assert lea["position"] == car["position"]
+    assert lea["journey"]["legs"][0]["edge_ids"] == [
+        "road:rowan-north", "road:west-avenue", "road:orchard-street"
+    ]
+    route = lea["car_trip"]["road_route"]
+    assert all(
+        left["x"] == right["x"] or left["y"] == right["y"]
+        for left, right in pairwise(route[1:-1])
+    )
+
+    restored = json.loads(json.dumps(world))
+    advance(world, 12)
+    advance(restored, 12)
+    assert restored["vehicles"] == world["vehicles"]
+    assert restored["people"] == world["people"]
+    assert car["state"] == "parked"
+    assert car.get("driver_id") is None
+    assert car.get("reserved_by") is None
+    assert lea.get("car_trip") is None
+    assert lea["target_place_id"] == work["id"]
+
+
+def test_owner_can_drive_the_parked_car_home_after_work():
+    world = build_fixture(788)
+    advance(world, 17 * 60 - 7 * 60 - 30)
+    lea = next(person for person in world["people"] if person["id"] == "person:lea")
+    car = next(vehicle for vehicle in world["vehicles"] if vehicle["id"] == "vehicle:lea")
+    assert lea["car_trip"]["destination_id"] == lea["home_place_id"]
+    assert car["reserved_by"] == lea["id"]
+    advance(world, 40)
+    assert car["state"] == "parked"
+    assert car["parking_place_id"] == lea["home_place_id"]
+    assert lea.get("in_vehicle_id") is None
+    assert lea.get("car_trip") is None
+    advance(world, 50)
+    lucas = next(person for person in world["people"] if person["id"] == "person:lucas")
+    van = next(vehicle for vehicle in world["vehicles"] if vehicle["id"] == "vehicle:lucas")
+    assert van["parking_place_id"] == lucas["home_place_id"]
+    assert van["state"] == "parked"
+
+
+def test_driving_state_survives_the_saved_world_api_round_trip():
+    with TestClient(create_app()) as client:
+        created = client.post("/api/worlds", json={"seed": 789}).json()
+        advanced = client.post(
+            f"/api/worlds/{created['id']}/advance", json={"minutes": 8}
+        ).json()
+        saved = client.get(f"/api/worlds/{created['id']}").json()
+        assert saved["vehicles"] == advanced["vehicles"]
+        lea = next(person for person in saved["people"] if person["id"] == "person:lea")
+        car = next(vehicle for vehicle in saved["vehicles"] if vehicle["id"] == "vehicle:lea")
+        assert lea["car_trip"]["phase"] == "driving"
+        assert lea["in_vehicle_id"] == car["id"]
+        assert car["driver_id"] == lea["id"]
+        assert car["position"] == lea["position"]
 
 
 def test_household_members_take_turns_grocery_shopping_and_shoppers_move_in_market():

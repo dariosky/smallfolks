@@ -131,6 +131,91 @@
   stroke: #3e5360;
   stroke-width: 3px;
 }
+.town-map .station-queue-place circle {
+  fill: #fff5d2;
+  stroke: #4b5a50;
+  stroke-width: 1.5;
+}
+.town-map .station-queue-place text {
+  fill: #243f48;
+  font-size: 6px;
+  font-weight: 900;
+  pointer-events: none;
+}
+.town-map .vehicle-driver {
+  cursor: pointer;
+}
+.town-map .map-entity.vehicle.palette-blue {
+  --vehicle-paint: #6d9fc1;
+  --vehicle-roof: #e7f2ef;
+}
+.town-map .map-entity.vehicle.palette-coral {
+  --vehicle-paint: #dc7868;
+  --vehicle-roof: #f9e9d3;
+}
+.town-map .vehicle-body .vehicle-selection-ring {
+  fill: none;
+  stroke: #1262c6;
+  stroke-width: 2;
+}
+.town-map .vehicle-body .vehicle-shadow {
+  fill: #41534b;
+  opacity: 0.28;
+  stroke: none;
+}
+.town-map .vehicle-body .vehicle-wheel {
+  fill: #263c43;
+  stroke: #f5e8d0;
+  stroke-width: 0.8;
+}
+.town-map .vehicle-body .vehicle-shell {
+  fill: var(--vehicle-paint, #dc7868);
+  stroke: #35464a;
+  stroke-width: 2;
+}
+.town-map .vehicle-body .vehicle-roof {
+  fill: var(--vehicle-roof, #f9e9d3);
+  stroke: #596b6b;
+  stroke-width: 1.2;
+}
+.town-map .vehicle-body .vehicle-windshield,
+.town-map .vehicle-body .vehicle-rear-window {
+  fill: #a9d5df;
+  stroke: #527985;
+  stroke-width: 1;
+}
+.town-map .vehicle-body .vehicle-hood {
+  fill: none;
+  stroke: #a9504d;
+  stroke-width: 1;
+}
+.town-map .vehicle-body .vehicle-lights {
+  fill: none;
+  stroke: #fff1ae;
+  stroke-width: 2.5;
+  stroke-linecap: round;
+}
+.town-map .vehicle-body .vehicle-tail-lights {
+  fill: none;
+  stroke: #ae4645;
+  stroke-width: 2.5;
+  stroke-linecap: round;
+}
+.town-map .vehicle-driver .vehicle-driver-hit {
+  fill: transparent;
+  stroke: none;
+}
+.town-map .vehicle-driver .vehicle-driver-head {
+  fill: #f2d3a9;
+  stroke: #654d46;
+  stroke-width: 0.8;
+}
+.town-map .vehicle-driver text {
+  fill: #304448;
+  font-size: 6px;
+  font-weight: 900;
+  pointer-events: none;
+}
 .town-map .station[role="button"],
 .town-map .folk-train-locomotive[role="button"] {
   cursor: pointer;
@@ -753,6 +838,7 @@
 }
 .town-map .map-entity.activity-sleep .person-body {
   animation: sleep-breathe 2.7s ease-in-out infinite alternate;
+  transform-box: fill-box;
   transform-origin: center;
 }
 .town-map .sleep-bed rect:first-child {
@@ -1336,4 +1422,17 @@
   to {
     transform: skewY(7deg);
   }
+}
+
+.town-map .driveway-paving {
+  fill: none;
+  stroke: #c6bfae;
+  stroke-width: 26;
+  stroke-linejoin: round;
+}
+.town-map .driveway-parking {
+  fill: none;
+  stroke: #eee8d8;
+  stroke-width: 1.5;
+  stroke-dasharray: 4 3;
 }

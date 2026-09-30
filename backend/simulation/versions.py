@@ -4,6 +4,7 @@ from copy import deepcopy
 from typing import Any
 
 from simulation.economy import ensure_economy
+from simulation.housing import ensure_home_parking
 from simulation.tick import STATIONS, rail_track
 
 WORLD_FORMAT_VERSION = 1
@@ -66,5 +67,6 @@ def migrate_snapshot(state: dict[str, Any]) -> dict[str, Any]:
                 if person.get("activity") == "Working as gardener" and person.get("target_place_id") == person.get("home_place_id"):
                     person["activity"] = "Tending the garden"
                     person["explanation"] = "Gardening at home is a hobby; paid gardening takes place at Fern Florist."
+    ensure_home_parking(migrated)
     ensure_economy(migrated)
     return migrated

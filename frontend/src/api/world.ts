@@ -4,7 +4,7 @@ const API_PREFIX =
   import.meta.env.VITE_API_PREFIX || (import.meta.env.DEV ? "http://127.0.0.1:5340/api" : "/api");
 
 export type Position = { x: number; y: number };
-export type Place = { id: string; name: string; kind: string; position: Position; business?: {
+export type Place = { id: string; name: string; kind: string; position: Position; house_style?: "large"; driveway?: { parking_position: Position; road_position: Position }; business?: {
   balance_cents: number;
   status: string;
   debt_cents: number;
@@ -102,6 +102,13 @@ export type Entity = {
   train_car_index?: number;
   train_seat_index?: number;
   train_trip?: { departure_id: string; arrival_id: string; destination_id: string; phase: string };
+  car_trip?: { vehicle_id: string; destination_id: string; phase: "access" | "driving" | "egress" };
+  in_vehicle_id?: string;
+  owner_id?: string;
+  reserved_by?: string;
+  driver_id?: string;
+  parking_place_id?: string;
+  heading?: number;
 };
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {

@@ -39,6 +39,33 @@ const world: World = {
 };
 
 describe("TownMap resident illustrations", () => {
+  it("shows an in-car resident through the moving vehicle without a second street sprite", () => {
+    const markup = renderToStaticMarkup(
+      <TownMap
+        world={{
+          ...world,
+          people: [{ ...world.people[0], id: "person:lea", name: "Lea", in_vehicle_id: "vehicle:lea" }],
+          vehicles: [{
+            id: "vehicle:lea", kind: "vehicle", name: "Lea's car",
+            position: { x: 300, y: 200 }, state: "driving", driver_id: "person:lea", heading: 90, palette: "blue",
+          }],
+        }}
+        selectedId="person:lea"
+        onSelect={() => {}}
+      />,
+    );
+    expect(markup).toContain("Lea driving");
+    expect(markup).toContain("vehicle-driver");
+    expect(markup).toContain('class="vehicle-body" transform="rotate(90)"');
+    expect(markup).toContain('class="entity-hit vehicle-hit" x="-22" y="-14" width="44" height="28"');
+    expect(markup).toContain('class="vehicle-selection-ring" x="-22" y="-14" width="44" height="28"');
+    expect(markup).not.toContain('class="entity-hit" r="25"');
+    expect(markup).toContain("palette-blue");
+    expect((markup.match(/class="vehicle-wheel"/g) ?? []).length).toBe(4);
+    expect(markup).toContain("vehicle-windshield");
+    expect(markup).not.toContain('class="map-entity person');
+  });
+
   it("uses the server rail path and shows a waiting station queue", () => {
     const markup = renderToStaticMarkup(
       <TownMap
@@ -73,6 +100,8 @@ describe("TownMap resident illustrations", () => {
     );
     expect(markup).toContain('points="450,58 550,58 450,58"');
     expect(markup).toContain("2 waiting");
+    expect(markup).toContain("1. person:one in boarding queue");
+    expect(markup).toContain("2. person:two in boarding queue");
     expect(markup).toContain("train-open-door");
   });
 
@@ -117,6 +146,20 @@ describe("TownMap resident illustrations", () => {
     ]) {
       expect(markup).toContain(symbol);
     }
+  });
+
+  it("renders a larger home with an open side driveway and a wider selection ring", () => {
+    const home = {
+      id: "place:rowan-2", name: "Rowan House 2", kind: "home",
+      position: { x: 190, y: 100 }, house_style: "large" as const,
+      driveway: { parking_position: { x: 238, y: 112 }, road_position: { x: 238, y: 170 } },
+    };
+    const markup = renderToStaticMarkup(
+      <TownMap world={{ ...world, places: [home], people: [] }} selectedId={home.id} onSelect={() => {}} />,
+    );
+    expect(markup).toContain('class="driveway-paving" d="M48 -12V70L48 70"');
+    expect(markup).toContain('translate(-8 -5) scale(1.12 1.15)');
+    expect(markup).toContain('class="house-selection-ring" x="-51" y="-65" width="114"');
   });
 
   it("uses a fixed house selection ring that does not grow with chimney smoke", () => {
