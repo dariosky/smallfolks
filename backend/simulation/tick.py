@@ -48,6 +48,7 @@ SOCIAL_BOREDOM_THRESHOLD = 30
 CINEMA_VISIT_MINUTES = 70
 CINEMA_BOREDOM_THRESHOLD = 28
 HOME_MEAL_HUNGER_THRESHOLD = 55
+MEAL_WINDOW_HUNGER_THRESHOLD = 35
 HOME_ACTIVITY_MINUTES = 15
 SLEEP_REST_THRESHOLD = 60
 SOCIAL_NEED_THRESHOLD = 60
@@ -57,6 +58,14 @@ PET_WALK_DURATION_SECONDS = 20 * 60
 PET_CLEANUP_DURATION_SECONDS = 20 * 60
 LOGICAL_TICK_SECONDS = 15
 NEED_PERIOD_SECONDS = {"hunger": 12 * 60, "rest": 20 * 60, "social": 30 * 60}
+BUSINESS_HOURS = {
+    "place:supermarket": (8 * 60, 20 * 60),
+    "place:florist": (9 * 60, 18 * 60),
+    "place:bakery": (6 * 60, 18 * 60),
+    "place:lantern-bar": (16 * 60, 23 * 60),
+    "place:cinema": (15 * 60, 23 * 60),
+}
+MINIMUM_STAFF = {"shop": 1, "bakery": 1, "bar": 1, "workplace": 1}
 
 
 def _place(world: dict, place_id: str) -> dict:
@@ -90,6 +99,26 @@ def _household_food_days(household: dict) -> float:
 
 def _household_needs_groceries(household: dict) -> bool:
     return household["food_servings"] <= len(household["member_ids"])
+
+
+def _is_business_open_and_staffed(world: dict, place: dict, current_minutes: int) -> bool:
+    opening, closing = BUSINESS_HOURS.get(place["id"], (0, 24 * 60))
+    if not opening <= current_minutes < closing:
+        return False
+    minimum_staff = MINIMUM_STAFF.get(place["kind"], 0)
+    working_staff = sum(
+        person["workplace_id"] == place["id"]
+        and person.get("shift_start_minute", 8 * 60)
+        <= current_minutes
+        < person.get("shift_end_minute", 17 * 60)
+        and person.get("activity", "").startswith("Working as")
+        for person in world["people"]
+    )
+    return working_staff >= minimum_staff
+
+
+def _is_meal_time(current_minutes: int) -> bool:
+    return 12 * 60 <= current_minutes < 13 * 60 or 19 * 60 <= current_minutes < 20 * 60
 
 
 def _consume_daily_food(world: dict, now: datetime) -> None:
@@ -230,6 +259,20 @@ def _eat_at_home(person: dict, home: dict, now: datetime) -> None:
     )
 
 
+def _eat_lunch_at_work(person: dict, work: dict, now: datetime) -> None:
+    minute_key = now.strftime("%Y-%m-%dT%H:%M")
+    if now.minute % 5 == 0 and person.get("last_meal_minute") != minute_key:
+        person["needs"]["hunger"] = max(0, person["needs"].get("hunger", 0) - 9)
+        person["last_meal_minute"] = minute_key
+    _move_to(
+        person,
+        work,
+        "Eating lunch at work",
+        "It is lunchtime and hunger is building, so this resident is taking a short meal break.",
+        "Resume work after lunch",
+    )
+
+
 def _sleep_at_home(person: dict, home: dict, now: datetime) -> None:
     minute_key = now.strftime("%Y-%m-%dT%H:%M")
     if now.minute % 5 == 0 and person.get("last_sleep_minute") != minute_key:
@@ -269,6 +312,16 @@ def _enjoy_home_activity(person: dict, home: dict, household: dict, now: datetim
         activity,
         f"{explanation} The household has food for about {food_days:g} more day(s).",
         f"{person['role']} shift tomorrow at {person.get('shift_start_minute', 480) // 60:02d}:00",
+    )
+
+
+def _wait_for_market(person: dict, home: dict, now: datetime) -> None:
+    _move_to(
+        person,
+        home,
+        "Waiting for Hearth Market to open",
+        "Food is running low, but the market is closed or does not have enough staff to serve customers.",
+        "Buy groceries when the market is open and staffed",
     )
 
 
@@ -484,14 +537,12 @@ def _walking_minutes(start: dict, destination: dict) -> int:
 
 
 def _station_walk_minutes(start: dict, destination: dict) -> int:
-    """Short station access is measured on the local paths, not the road graph."""
-    start_position = start["position"]
-    destination_position = destination["position"]
+    """Station access uses a short local path, at the normal walking speed."""
     distance = hypot(
-        destination_position["x"] - start_position["x"],
-        destination_position["y"] - start_position["y"],
+        destination["position"]["x"] - start["position"]["x"],
+        destination["position"]["y"] - start["position"]["y"],
     )
-    return max(1, ceil(distance / 25))
+    return max(1, ceil(distance / WALKING_SPEED))
 
 
 def _move_to(
@@ -540,6 +591,41 @@ def _walk_to(
                 "start_location": {"kind": "place", "place_id": start["id"]},
                 "end_location": {"kind": "place", "place_id": destination["id"]},
                 "edge_ids": ["pedestrian-route"],
+                "distance": route_length(route),
+                "progress": min(1, max(0, progress)),
+            }
+        ],
+    }
+
+
+def _walk_station_to(
+    person: dict,
+    start: dict,
+    destination: dict,
+    progress: float,
+    next_commitment: str,
+    activity: str,
+    explanation: str,
+) -> None:
+    """Render station access on a local path at normal pedestrian speed."""
+    route = [_position_at(person, start), _position_at(person, destination)]
+    person["position"] = position_on_route(route, progress)
+    person["target_place_id"] = destination["id"]
+    person["activity"] = activity
+    person["explanation"] = explanation
+    person["next_commitment"] = next_commitment
+    person["route"] = route
+    person["journey"] = {
+        "id": f"journey:{person['id']}:{start['id']}:{destination['id']}",
+        "status": "active",
+        "active_leg_index": 0,
+        "legs": [
+            {
+                "id": f"leg:{start['id']}:{destination['id']}",
+                "mode": "walk",
+                "start_location": {"kind": "place", "place_id": start["id"]},
+                "end_location": {"kind": "place", "place_id": destination["id"]},
+                "edge_ids": ["station-access"],
                 "distance": route_length(route),
                 "progress": min(1, max(0, progress)),
             }
@@ -682,7 +768,9 @@ def _train_journey(start: dict, destination: dict) -> dict | None:
             rail_minutes = SERVICE_TRAVEL_MINUTES[(departure["id"], arrival["id"])]
             departure_minute = SERVICE_DEPARTURES[departure["id"]]
             arrival_minute = departure_minute + rail_minutes
-            if arrival_minute + egress_minutes > 30:
+            # A realistic pedestrian egress can run past the nominal shift start;
+            # the commuter remains on their route rather than being snapped to work.
+            if arrival_minute + egress_minutes > 60:
                 continue
             total_minutes = access_minutes + rail_minutes + egress_minutes
             candidate = {
@@ -735,7 +823,7 @@ def _take_train_to(
     journey_start = departure_minute - access_minutes
     if minutes_since_start < departure_minute:
         if minutes_since_start >= journey_start and minutes_since_start < 0:
-            _walk_to(
+            _walk_station_to(
                 person,
                 start,
                 departure,
@@ -806,7 +894,7 @@ def _take_train_to(
         person.pop("train_seat_index", None)
         person.pop("train_departure_id", None)
         person.pop("train_arrival_id", None)
-        _walk_to(
+        _walk_station_to(
             person,
             arrival,
             destination,
@@ -884,28 +972,42 @@ def _advance_step(world: dict, seconds: int) -> dict:
             )
         if _care_for_pet(world, person, pippin, now):
             continue
-        if commute_start <= current_minutes < shift_start:
+        train_window_ends = (
+            train_journey["arrival_minute"] + train_journey["egress_minutes"]
+            if train_journey
+            else None
+        )
+        if (
+            train_journey
+            and commute_start <= current_minutes
+            and minutes_since_service_start < train_window_ends
+        ):
+            _take_train_to(
+                world,
+                person,
+                home,
+                work,
+                train_journey,
+                minutes_since_service_start,
+                f"{person['role']} shift at {shift_start // 60:02d}:{shift_start % 60:02d}",
+            )
+        elif commute_start <= current_minutes < shift_start:
             elapsed_minutes = current_minutes - commute_start
-            if train_journey:
-                _take_train_to(
-                    world,
-                    person,
-                    home,
-                    work,
-                    train_journey,
-                    minutes_since_service_start,
-                    f"{person['role']} shift at {shift_start // 60:02d}:{shift_start % 60:02d}",
-                )
-            else:
-                _walk_to(
+            _walk_to(
                     person,
                     home,
                     work,
                     elapsed_minutes / commute_minutes,
                     f"{person['role']} shift at {shift_start // 60:02d}:{shift_start % 60:02d}",
-                )
+            )
         elif shift_start <= current_minutes < shift_end:
             _increase_quiet_shift_boredom(world, person, work, now)
+            if (
+                _is_meal_time(current_minutes)
+                and person["needs"].get("hunger", 0) >= MEAL_WINDOW_HUNGER_THRESHOLD
+            ):
+                _eat_lunch_at_work(person, work, now)
+                continue
             next_commitment = (
                 "Buy groceries after work"
                 if _household_needs_groceries(household)
@@ -949,6 +1051,7 @@ def _advance_step(world: dict, seconds: int) -> dict:
                 person["id"] == grocery_shopper_id
                 and household.get("grocery_assigned_date") == now.date().isoformat()
             )
+            market_available = _is_business_open_and_staffed(world, market, current_minutes)
             grocery_browsing_minutes = _grocery_browsing_minutes(household)
             social_visit_today = person.get("social_visit_date") == now.date().isoformat()
             needs_social_outing = person["needs"].get("social", 0) >= SOCIAL_NEED_THRESHOLD
@@ -967,7 +1070,25 @@ def _advance_step(world: dict, seconds: int) -> dict:
                 wants_cinema and not needs_social_outing and cinema_score > social_score
             )
             needs_sleep = person["needs"].get("rest", 0) >= SLEEP_REST_THRESHOLD
-            if needs_sleep and after_work_minutes < work_to_home_minutes:
+            needs_meal = (
+                person["needs"].get("hunger", 0) >= HOME_MEAL_HUNGER_THRESHOLD
+                or (
+                    _is_meal_time(current_minutes)
+                    and person["needs"].get("hunger", 0) >= MEAL_WINDOW_HUNGER_THRESHOLD
+                )
+            )
+            if needs_meal and household["food_servings"] > 0 and _is_near_place(person, home):
+                _eat_at_home(person, home, now)
+            elif needs_meal and household["food_servings"] > 0:
+                _walk_from_current_position(
+                    world,
+                    person,
+                    home,
+                    "Eat at home",
+                    "Walking home to eat",
+                    "There is food at home, so hunger takes priority over an optional outing.",
+                )
+            elif needs_sleep and after_work_minutes < work_to_home_minutes:
                 _walk_to(
                     person,
                     work,
@@ -989,21 +1110,44 @@ def _advance_step(world: dict, seconds: int) -> dict:
                         "Walking home to rest",
                         "They are tired enough that rest takes priority over the evening's other plans.",
                     )
-            elif is_grocery_shopper and after_work_minutes < work_to_market_minutes:
-                _walk_to(
-                    person,
-                    work,
-                    market,
-                    after_work_minutes / work_to_market_minutes,
-                    "Buy groceries at Hearth Market",
-                    "Walking to Hearth Market",
-                    "Food at home is running low, so groceries take priority before going home.",
-                )
-            elif is_grocery_shopper and after_work_minutes < (
+            elif is_grocery_shopper and market_available and after_work_minutes < work_to_market_minutes:
+                if _is_near_place(person, work):
+                    _walk_to(
+                        person,
+                        work,
+                        market,
+                        after_work_minutes / work_to_market_minutes,
+                        "Buy groceries at Hearth Market",
+                        "Walking to Hearth Market",
+                        "Food at home is running low, so groceries take priority before going home.",
+                    )
+                else:
+                    _walk_from_current_position(
+                        world,
+                        person,
+                        market,
+                        "Buy groceries at Hearth Market",
+                        "Walking to Hearth Market",
+                        "Food at home is running low, so this shopper is walking there from their current position.",
+                    )
+            elif is_grocery_shopper and market_available and after_work_minutes < (
                 work_to_market_minutes + grocery_browsing_minutes
             ):
-                _shop_for_groceries(person, household, market, current_minutes, now)
-            elif is_grocery_shopper and after_work_minutes < (
+                if _is_near_place(person, market) or (
+                    person.get("target_place_id") == market["id"]
+                    and person.get("activity", "").startswith("Shopping")
+                ):
+                    _shop_for_groceries(person, household, market, current_minutes, now)
+                else:
+                    _walk_from_current_position(
+                        world,
+                        person,
+                        market,
+                        "Buy groceries at Hearth Market",
+                        "Walking to Hearth Market",
+                        "The market is open and staffed, but this shopper has not arrived yet.",
+                    )
+            elif is_grocery_shopper and market_available and after_work_minutes < (
                 work_to_market_minutes
                 + grocery_browsing_minutes
                 + market_to_home_minutes
@@ -1121,8 +1265,10 @@ def _advance_step(world: dict, seconds: int) -> dict:
                         "Walking home",
                         "The evening activity is over, so this resident is walking home rather than appearing there.",
                     )
-                elif person["needs"].get("hunger", 0) >= HOME_MEAL_HUNGER_THRESHOLD:
+                elif needs_meal and household["food_servings"] > 0:
                     _eat_at_home(person, home, now)
+                elif needs_meal and household["food_servings"] <= 0 and not market_available:
+                    _wait_for_market(person, home, now)
                 else:
                     _enjoy_home_activity(person, home, household, now)
 

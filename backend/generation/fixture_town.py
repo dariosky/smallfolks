@@ -88,6 +88,7 @@ PEOPLE = [
 ]
 
 SHIFT_WINDOWS = {
+    "person:diego": (8 * 60, 20 * 60),
     "person:marta": (16 * 60, 23 * 60),
     "person:hugo": (15 * 60, 23 * 60),
     "person:irene": (16 * 60, 22 * 60),

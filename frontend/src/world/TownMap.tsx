@@ -2,6 +2,13 @@ import type { CSSProperties, KeyboardEvent } from "react";
 import "./sketch.css";
 
 import type { Entity, Place, Train, World } from "../api/world";
+import {
+  activityKind,
+  activityLabels,
+  appearanceFor,
+  type ActivityKind,
+  type Appearance,
+} from "./personVisuals";
 
 type Props = {
   world: World;
@@ -83,7 +90,12 @@ export function TownMap({ world, selectedId, onSelect }: Props) {
       <g className="crosswalk">
         <path d="M340 330v40m8-40v40m8-40v40m8-40v40m8-40v40m8-40v40M830 330v40m8-40v40m8-40v40m8-40v40m8-40v40" />
       </g>
-      <TrainLoop onSelect={onSelect} passengers={trainPassengers} train={world.trains?.[0]} />
+      <TrainLoop
+        onSelect={onSelect}
+        passengers={trainPassengers}
+        seed={world.seed}
+        train={world.trains?.[0]}
+      />
       {selected?.route ? (
         <polyline
           className="active-route"
@@ -100,20 +112,36 @@ export function TownMap({ world, selectedId, onSelect }: Props) {
       ))}
       <TownTrees />
       <TownDetails />
-      {[
-        ...world.people.filter((person) => !trainPassengers.includes(person)),
-        ...world.pets,
-        ...world.vehicles,
-      ]
-        .sort((a, b) => a.position.y - b.position.y)
-        .map((entity) => (
-          <EntitySprite
-            entity={entity}
-            key={entity.id}
-            onSelect={onSelect}
-            selected={entity.id === selectedId}
-          />
-        ))}
+      {(() => {
+        const visible = [
+          ...world.people.filter((person) => !person.on_train),
+          ...world.pets,
+          ...world.vehicles,
+        ].sort((a, b) => a.position.y - b.position.y);
+        const seen = new Map<string, number>();
+        const counts = new Map<string, number>();
+        for (const entity of visible) {
+          const key = `${entity.position.x},${entity.position.y}`;
+          counts.set(key, (counts.get(key) ?? 0) + 1);
+        }
+        return visible.map((entity) => {
+          const key = `${entity.position.x},${entity.position.y}`;
+          const index = seen.get(key) ?? 0;
+          seen.set(key, index + 1);
+          const count = counts.get(key) ?? 1;
+          return (
+            <EntitySprite
+              entity={entity}
+              key={entity.id}
+              onSelect={onSelect}
+              selected={entity.id === selectedId}
+              seed={world.seed}
+              badgeLift={index * 20}
+              visualOffset={{ x: (index - (count - 1) / 2) * 26, y: index % 2 ? 5 : -5 }}
+            />
+          );
+        });
+      })()}
       <g className="map-labels" aria-hidden="true">
         <text x="55" y="690">
           ROWAN HOMES
@@ -140,10 +168,12 @@ function TrainLoop({
   train,
   passengers,
   onSelect,
+  seed,
 }: {
   train?: Train;
   passengers: Entity[];
   onSelect: Props["onSelect"];
+  seed: number;
 }) {
   const loop =
     "M450 58H1090Q1120 58 1120 88V630Q1120 660 1090 660H450Q420 660 420 630V88Q420 58 450 58Z";
@@ -172,12 +202,14 @@ function TrainLoop({
         distance={frontDistance - 48}
         kind="coach"
         onSelect={onSelect}
+        seed={seed}
         passengers={passengers.filter((person) => person.train_car_index === 0)}
       />
       <TrainCar
         distance={frontDistance - 96}
         kind="coach"
         onSelect={onSelect}
+        seed={seed}
         passengers={passengers.filter((person) => person.train_car_index === 1)}
       />
       {passengers.length ? (
@@ -194,11 +226,13 @@ function TrainCar({
   kind,
   passengers = [],
   onSelect,
+  seed,
 }: {
   distance: number;
   kind: "locomotive" | "coach";
   passengers?: Entity[];
   onSelect?: Props["onSelect"];
+  seed?: number;
 }) {
   const { x, y, heading } = railPosition(distance);
   return (
@@ -220,7 +254,12 @@ function TrainCar({
           <rect className="train-roof-kit" height="10" rx="1" width="11" x="-5" y="-5" />
           <path className="train-windows" d="M-14-7v14M-4-7v14M6-7v14M16-7v14" />
           {passengers.map((passenger) => (
-            <TrainPassenger key={passenger.id} onSelect={onSelect} passenger={passenger} />
+            <TrainPassenger
+              key={passenger.id}
+              onSelect={onSelect}
+              passenger={passenger}
+              seed={seed ?? 0}
+            />
           ))}
           <path className="train-bogies" d="M-15 11h12M4 11h12" />
         </>
@@ -232,9 +271,11 @@ function TrainCar({
 function TrainPassenger({
   passenger,
   onSelect,
+  seed,
 }: {
   passenger: Entity;
   onSelect?: Props["onSelect"];
+  seed: number;
 }) {
   const seatPositions = [
     [-13, -2],
@@ -243,10 +284,18 @@ function TrainPassenger({
     [13, -2],
   ];
   const [x, y] = seatPositions[passenger.train_seat_index ?? 0] ?? seatPositions[0];
+  const appearance = appearanceFor(passenger.id, seed);
   return (
     <g
       aria-label={`${passenger.name}, seated on Folk Loop`}
       className={`train-passenger train-passenger-${passenger.palette ?? "blue"}`}
+      style={
+        {
+          "--skin": appearance.skinColor,
+          "--hair": appearance.hairColor,
+          "--outfit": appearance.outfit,
+        } as CSSProperties
+      }
       onClick={() => onSelect?.(passenger)}
       onKeyDown={(event) => activate(event, () => onSelect?.(passenger))}
       role="button"
@@ -255,6 +304,14 @@ function TrainPassenger({
     >
       <circle cy="-3" r="2.5" />
       <path d="M-2 0Q0-2 2 0v5h-4z" />
+      <path
+        className="train-passenger-hair"
+        d={
+          appearance.hair === "long" || appearance.hair === "bob"
+            ? "M-3-4q0-4 3-4t3 4v4H2v-4H-2v4h-1Z"
+            : "M-3-4q0-4 3-4t3 4q-3-2-6 0Z"
+        }
+      />
     </g>
   );
 }
@@ -330,6 +387,12 @@ function Building({
         height="106"
         rx="12"
       />
+      {isHome && selected && (
+        <g className="house-selection" pointerEvents="none" aria-hidden="true">
+          <rect className="house-selection-halo" x="-41" y="-54" width="82" height="94" rx="8" />
+          <rect className="house-selection-ring" x="-41" y="-54" width="82" height="94" rx="8" />
+        </g>
+      )}
       {isPark ? (
         <>
           <path className="park-lawn" d="M-66-46Q-8-56 62-46Q77-10 66 45Q8 56-68 44Q-78 4-66-46Z" />
@@ -363,14 +426,7 @@ function Building({
                   className="awning-stripes"
                   d="m-22-8-2 12M-10-8l-1 12M2-8V4m12-12 1 12m11-12 2 12"
                 />
-                <circle className="shop-emblem" cy="-26" r="9" />
-                <text className="shop-emblem-letter" y="-23">
-                  {place.kind === "bakery"
-                    ? "B"
-                    : place.kind === "bar"
-                      ? "L"
-                      : place.name.charAt(0)}
-                </text>
+                <BuildingFeature placeId={place.id} />
               </>
             )}
           </g>
@@ -391,23 +447,155 @@ function Building({
   );
 }
 
+function BuildingFeature({ placeId }: { placeId: string }) {
+  switch (placeId) {
+    case "place:clinic":
+      return (
+        <g className="landmark landmark-clinic" aria-hidden="true">
+          <path className="clinic-sign" d="M-12-39h24v23h-24z" />
+          <path className="clinic-cross" d="M-3-35h6v6h6v6H3v6h-6v-6h-6v-6h6z" />
+          <path className="clinic-window" d="M-25 14h12m26 0h12" />
+        </g>
+      );
+    case "place:school":
+      return (
+        <g className="landmark landmark-school" aria-hidden="true">
+          <path className="school-belfry" d="M-11-38v-14h22v14m-25-14 14-12 14 12" />
+          <circle className="school-clock" cy="-45" r="7" />
+          <path className="school-hands" d="M0-49v4l3 2" />
+          <path className="school-board" d="M-26 11h14v13h-14z" />
+          <text className="school-letters" x="-19" y="20">
+            ABC
+          </text>
+        </g>
+      );
+    case "place:lantern-bar":
+      return (
+        <g className="landmark landmark-bar" aria-hidden="true">
+          <path className="bar-bracket" d="M20-25h17v6" />
+          <g className="bar-lantern">
+            <path d="M31-19h12l-2 17H33zM36-24v5m-3 6h8" />
+            <path className="bar-flame" d="M37-6q-5-6 0-10 5 4 0 10" />
+          </g>
+          <path className="bar-table" d="M-27 25h16m-8 0v7m-7-7-3-5m16 5 3-5" />
+        </g>
+      );
+    case "place:cinema":
+      return (
+        <g className="landmark landmark-cinema" aria-hidden="true">
+          <circle className="cinema-reel" cy="-32" r="12" />
+          <path className="cinema-reel-holes" d="M-3-36h.1m7 2h.1m-7 6h.1m-3-4h.1" />
+          <path className="cinema-marquee" d="M-31-7h62v15h-62z" />
+          <text className="cinema-word" y="4">
+            CINEMA
+          </text>
+          <path className="cinema-bulbs" d="M-27 10h.1m8 0h.1m8 0h.1m20 0h.1m8 0h.1m8 0h.1" />
+        </g>
+      );
+    case "place:post-office":
+      return (
+        <g className="landmark landmark-post" aria-hidden="true">
+          <path className="post-plaque" d="M-17-35h34v20h-34z" />
+          <path className="post-envelope" d="M-12-31h24v12h-24zM-12-31 0-23l12-8" />
+          <path className="post-box" d="M23 8h10v20H23zM21 8q7-8 14 0M25 13h6" />
+        </g>
+      );
+    case "place:library":
+      return (
+        <g className="landmark landmark-library" aria-hidden="true">
+          <path className="library-pediment" d="M-26-17 0-38l26 21z" />
+          <path
+            className="library-book"
+            d="M-12-24q6-3 12 1 6-4 12-1v11q-6-4-12 1-6-5-12-1zM0-23v11"
+          />
+          <path className="library-columns" d="M-24 8v18m7-18v18m34-18v18m7-18v18" />
+        </g>
+      );
+    case "place:townhall":
+      return (
+        <g className="landmark landmark-townhall" aria-hidden="true">
+          <path className="townhall-flagpole" d="M0-42v-23" />
+          <path className="townhall-flag" d="M0-65q8-4 15 0v12q-8-3-15 1z" />
+          <path className="townhall-columns" d="M-25 8v18m8-18v18m34-18v18m8-18v18" />
+        </g>
+      );
+    case "place:workshop":
+      return (
+        <g className="landmark landmark-workshop" aria-hidden="true">
+          <circle className="workshop-gear" cy="-29" r="10" />
+          <circle className="workshop-gear-centre" cy="-29" r="3" />
+          <path className="workshop-wrench" d="m-24 17 14-14m-5-4-5 4m5-4 2 6" />
+        </g>
+      );
+    case "place:bakery":
+      return (
+        <g className="landmark landmark-bakery" aria-hidden="true">
+          <path className="bakery-loaf" d="M-15-18q0-16 15-16t15 16z" />
+          <path className="bakery-cuts" d="m-8-27 3 6m5-8 2 7m6-5 2 5" />
+        </g>
+      );
+    case "place:supermarket":
+      return (
+        <g className="landmark landmark-market" aria-hidden="true">
+          <path className="market-crate" d="M-15-28h30l-3 16h-24zM-13-23h26" />
+          <circle className="market-fruit" cx="-6" cy="-28" r="4" />
+          <circle className="market-fruit" cx="4" cy="-29" r="5" />
+        </g>
+      );
+    case "place:florist":
+      return (
+        <g className="landmark landmark-florist" aria-hidden="true">
+          <path className="florist-pot" d="M-10-17h20l-3 10H-7z" />
+          <path className="florist-stems" d="M0-17v-18m0 13-10-8m10 6 10-7" />
+          <circle className="florist-bloom" cy="-36" r="5" />
+          <circle className="florist-bloom" cx="-11" cy="-30" r="4" />
+          <circle className="florist-bloom" cx="11" cy="-32" r="4" />
+        </g>
+      );
+    default:
+      return (
+        <g className="landmark landmark-generic" aria-hidden="true">
+          <circle className="shop-emblem" cy="-26" r="9" />
+          <path className="generic-star" d="M0-32v12m-6-6H6" />
+        </g>
+      );
+  }
+}
+
 function EntitySprite({
   entity,
   onSelect,
   selected,
+  seed,
+  visualOffset,
+  badgeLift,
 }: {
   entity: Entity;
   onSelect: Props["onSelect"];
   selected: boolean;
+  seed: number;
+  visualOffset: { x: number; y: number };
+  badgeLift: number;
 }) {
-  const walking = entity.activity?.startsWith("Walking") || false;
-  const eating =
-    entity.activity?.includes("Breakfast") || entity.activity?.includes("eating") || false;
-  const socializing = entity.activity?.startsWith("Socializing") || false;
-  const sleeping = entity.activity?.startsWith("Sleeping") || false;
-  const working = entity.activity?.startsWith("Working as") || false;
+  const activity = activityKind(entity.activity, entity.role);
+  const appearance = entity.kind === "person" ? appearanceFor(entity.id, seed) : null;
+  const working = activity === "work";
   const workStyle = working ? workStyleFor(entity.role) : undefined;
-  const className = `map-entity ${entity.kind} palette-${entity.palette ?? "blue"} ${walking ? "is-walking" : ""} ${eating ? "is-eating" : ""} ${workStyle ? `is-working work-${workStyle}` : ""} ${selected ? "is-selected" : ""}`;
+  const x = entity.position.x + visualOffset.x;
+  const y = entity.position.y + visualOffset.y;
+  const className = `map-entity ${entity.kind} activity-${activity} ${selected ? "is-selected" : ""}`;
+  const visualStyle = {
+    transform: `translate(${x}px, ${y}px)`,
+    "--motion-delay": `${(-(seed + entity.id.length) % 21) * 0.13}s`,
+    ...(appearance
+      ? {
+          "--skin": appearance.skinColor,
+          "--hair": appearance.hairColor,
+          "--outfit": appearance.outfit,
+          "--outfit-dark": appearance.outfitDark,
+        }
+      : {}),
+  } as CSSProperties;
   return (
     <g
       className={className}
@@ -415,92 +603,220 @@ function EntitySprite({
       aria-pressed={selected}
       onClick={() => onSelect(entity)}
       onKeyDown={(event) => activate(event, () => onSelect(entity))}
-      style={
-        {
-          transform: `translate(${entity.position.x}px, ${entity.position.y}px)`,
-          "--motion-delay": `${-entity.id.length * 0.17}s`,
-        } as CSSProperties
-      }
+      style={visualStyle}
       role="button"
       tabIndex={0}
-      transform={`translate(${entity.position.x} ${entity.position.y})`}
+      transform={`translate(${x} ${y})`}
     >
-      <g>
-        <circle className="entity-hit" r="21" />
-        {selected && <ellipse className="selection-ring" cy="10" rx="17" ry="9" />}
-        <ellipse className="entity-shadow" cy="12" rx={entity.kind === "vehicle" ? 17 : 8} ry="3" />
-        {entity.kind === "person" ? (
+      <circle className="entity-hit" r="25" />
+      {selected && <ellipse className="selection-ring" cy="13" rx="19" ry="9" />}
+      <ellipse className="entity-shadow" cy="14" rx={entity.kind === "vehicle" ? 17 : 9} ry="3" />
+      {entity.kind === "person" && appearance ? (
+        <>
           <PersonSprite
+            appearance={appearance}
+            activity={activity}
             carryingGroceries={entity.carrying_groceries === true}
-            eating={eating}
-            socializing={socializing}
-            sleeping={sleeping}
             workStyle={workStyle}
           />
-        ) : entity.kind === "pet" ? (
-          <PetSprite />
-        ) : (
-          <VehicleSprite />
-        )}
-        {selected ? (
-          <text className="entity-label" y="-29">
-            {entity.name.split(" ")[0]}
-          </text>
-        ) : null}
-      </g>
+          <ActivityBadge kind={activity} selected={selected} lift={badgeLift} />
+        </>
+      ) : entity.kind === "pet" ? (
+        <PetSprite activity={activity} />
+      ) : (
+        <VehicleSprite />
+      )}
+      {selected && (
+        <text className="entity-label" y={-63 - badgeLift}>
+          {entity.name.split(" ")[0]}
+        </text>
+      )}
+    </g>
+  );
+}
+
+function ActivityBadge({
+  kind,
+  selected,
+  lift,
+}: {
+  kind: ActivityKind;
+  selected: boolean;
+  lift: number;
+}) {
+  const label = activityLabels[kind];
+  const width = label.length * 5.3 + 18;
+  return (
+    <g
+      className={`activity-badge ${selected ? "is-highlighted" : ""}`}
+      transform={`translate(0 ${-39 - lift})`}
+      aria-hidden="true"
+      pointerEvents="none"
+    >
+      <rect x={-width / 2} y="-10" width={width} height="17" rx="8" />
+      <text y="2">{label}</text>
     </g>
   );
 }
 
 function PersonSprite({
+  appearance,
+  activity,
   carryingGroceries,
-  eating,
-  socializing,
-  sleeping,
   workStyle,
 }: {
+  appearance: Appearance;
+  activity: ActivityKind;
   carryingGroceries: boolean;
-  eating: boolean;
-  socializing: boolean;
-  sleeping: boolean;
   workStyle?: WorkStyle;
 }) {
+  const sleeping = activity === "sleep";
   return (
-    <g className="person-body">
-      {eating ? (
+    <>
+      {sleeping && (
+        <g className="sleep-bed" aria-hidden="true">
+          <rect x="-23" y="-8" width="47" height="19" rx="5" />
+          <rect className="sleep-pillow" x="-20" y="-5" width="12" height="13" rx="3" />
+        </g>
+      )}
+      <g className={`person-body hair-${appearance.hair} ${appearance.skirt ? "wears-skirt" : ""}`}>
+        <path className="person-legs leg-left" d="M-4 10v8l-2 1" />
+        <path className="person-legs leg-right" d="M4 10v8l2 1" />
+        <path className="person-torso" d="M-7 0Q0-5 7 0v12H-7z" />
+        {appearance.skirt && <path className="person-skirt" d="M-6 7h12l3 8H-9Z" />}
+        <circle className="person-head" cy="-8" r="7" />
+        <Hair style={appearance.hair} />
+        {sleeping ? (
+          <path className="person-sleep-face" d="M-5-8q2 2 4 0m3 0q2 2 4 0" />
+        ) : (
+          <path className="person-face" d="M-3-8h.1M3-8h.1M-2-4q2 2 4 0" />
+        )}
+        {appearance.freckles && !sleeping && (
+          <path className="person-freckles" d="M-5-5h.1m1 1h.1M4-5h.1m1 1h.1" />
+        )}
+        {appearance.glasses && !sleeping && (
+          <path className="person-glasses" d="M-6-10h5v4h-5Zm7 0h5v4H1Zm-2 2h2" />
+        )}
+        <path className="person-arm arm-left" d="M-7 2-11 9" />
+        <path className="person-arm arm-right" d="M7 2l4 7" />
+      </g>
+      <ActivityProp kind={activity} workStyle={workStyle} carryingGroceries={carryingGroceries} />
+    </>
+  );
+}
+
+function Hair({ style }: { style: Appearance["hair"] }) {
+  const shape = {
+    crop: "M-7-9Q-6-17 1-16Q8-15 7-9Q2-13-7-9Z",
+    sweep: "M-8-8Q-6-18 3-17Q11-15 7-5L4-10Q-2-6-8-8Z",
+    bob: "M-8-9Q-8-17 0-17Q9-17 9-7L7 2H4L5-8Q0-12-6-7L-5 2H-8Z",
+    long: "M-8-9Q-7-18 1-17Q10-16 9-7L11 7H6L5-8Q0-12-5-7L-6 7H-11Z",
+    bun: "M-7-8Q-7-16 0-16Q8-16 8-7Q0-12-7-8ZM6-14Q7-21 12-18Q16-13 9-11Z",
+  }[style];
+  return <path className="person-hair" d={shape} />;
+}
+
+function ActivityProp({
+  kind,
+  workStyle,
+  carryingGroceries,
+}: {
+  kind: ActivityKind;
+  workStyle?: WorkStyle;
+  carryingGroceries: boolean;
+}) {
+  return (
+    <g className={`activity-prop prop-${kind}`} aria-hidden="true">
+      {kind === "sleep" && (
         <>
-          <ellipse className="breakfast-plate" cx="0" cy="12" rx="8" ry="3" />
-          <path className="breakfast-spoon" d="M8 4 12-1" />
+          <path className="sleep-blanket" d="M-2-7h24v18H-2q5-8 0-18Z" />
+          <text className="sleep-z" x="18" y="-18">
+            zZ
+          </text>
         </>
-      ) : null}
-      {carryingGroceries ? (
-        <g className="grocery-bags">
-          <path className="grocery-bag" d="M4 6h13l2 13H2z" />
-          <path className="grocery-bag-handle" d="M7 6c0-6 7-6 7 0" />
-          <circle className="grocery-produce" cx="7" cy="8" r="2.5" />
-          <circle className="grocery-produce" cx="14" cy="9" r="2.5" />
-        </g>
-      ) : null}
-      {socializing ? (
-        <g className="beer-mug">
-          <path className="beer-glass" d="M8 2h7v11H8z" />
-          <path className="beer-foam" d="M8 2q2-3 4 0q2-3 4 0" />
-          <path className="beer-handle" d="M15 5h4v6h-4" />
-        </g>
-      ) : null}
-      {workStyle ? <WorkActivity style={workStyle} /> : null}
-      {sleeping ? (
-        <text className="sleep-z" x="8" y="-12">
-          zZ
-        </text>
-      ) : null}
-      <path className="person-legs leg-left" d="M-4 10v7l-2 1" />
-      <path className="person-legs leg-right" d="M4 10v7l2 1" />
-      <path className="person-torso" d="M-7 0Q0-5 7 0v12H-7z" />
-      <circle className="person-head" cy="-8" r="7" />
-      <path className="person-hair" d="M-7-9Q-3-17 5-14Q8-11 6-6Q1-10-7-7z" />
-      <path className="person-face" d="M-3-8h.1M3-8h.1M-2-4q2 2 4 0" />
-      <path className="person-arm" d="M-7 2-11 9M7 2l4 7" />
+      )}
+      {kind === "read" && (
+        <>
+          <path
+            className="prop-book"
+            d="M-1 4q6-3 12 1v10q-6-3-12 0zm12 1q6-4 12-1v10q-6-3-12 1Z"
+          />
+          <path className="book-lines" d="M2 7h6m-6 3h6m6-3h6m-6 3h6" />
+        </>
+      )}
+      {kind === "garden" && (
+        <>
+          <path className="prop-watering-can" d="M8 2h12v10H8Zm12 3h5q2 5-5 6M10 2V0h8" />
+          <path className="garden-drops" d="m25 12 2 3m2-2 2 3" />
+          <path className="garden-sprout" d="M29 20v-5m0 2q-4-5-6-3m6 2q3-5 6-3" />
+        </>
+      )}
+      {kind === "call" && (
+        <>
+          <rect className="prop-phone" x="8" y="-11" width="7" height="14" rx="2" />
+          <path className="phone-signal" d="M18-11q6 4 0 8m3-11q9 7 0 14" />
+        </>
+      )}
+      {kind === "chores" && (
+        <>
+          <path className="prop-broom" d="M16-16 12 11m-5 0h10l2 7H5Z" />
+          <path className="chores-sparkle" d="M23 4v6m-3-3h6" />
+        </>
+      )}
+      {kind === "hobby" && (
+        <>
+          <rect className="prop-canvas" x="9" y="-11" width="17" height="17" rx="2" />
+          <path className="canvas-doodle" d="m12 2 4-5 4 4 3-6" />
+          <path className="prop-brush" d="m7 13 14-19" />
+        </>
+      )}
+      {kind === "eat" && (
+        <>
+          <ellipse className="breakfast-plate" cx="13" cy="13" rx="12" ry="5" />
+          <circle className="plate-food" cx="13" cy="12" r="4" />
+          <path className="breakfast-spoon" d="M7 5 10-2" />
+          <path className="steam-lines" d="M10 2q-3-3 0-6m8 6q-3-3 0-6" />
+        </>
+      )}
+      {kind === "shop" && (
+        <>
+          <path className="prop-basket" d="M7 6h17l-3 13H10Zm3 0q1-9 6-9t6 9" />
+          <circle className="basket-produce" cx="12" cy="7" r="3" />
+          <circle className="basket-produce" cx="19" cy="6" r="3" />
+        </>
+      )}
+      {kind === "film" && (
+        <>
+          <rect className="prop-screen" x="9" y="-14" width="22" height="18" rx="2" />
+          <path className="screen-play" d="m18-10 7 5-7 5Z" />
+          <path className="screen-rays" d="M12 8v3m6-2v4m6-4v3" />
+        </>
+      )}
+      {kind === "social" && (
+        <>
+          <path className="beer-glass" d="M9 2h10v13H9z" />
+          <path className="beer-foam" d="M9 2q3-4 5 0q3-4 5 0" />
+          <path className="beer-handle" d="M19 5h5v7h-5" />
+          <path className="social-chatter" d="M-17-16h15v9l-4-3h-11Z" />
+        </>
+      )}
+      {kind === "walk" && (
+        <>
+          <path className="walking-trail" d="M-16 19h3m4 2h3m4-2h3" />
+          {carryingGroceries && (
+            <g className="grocery-bags">
+              <path className="grocery-bag" d="M7 6h13l2 13H5z" />
+              <path className="grocery-bag-handle" d="M10 6q3-8 7 0" />
+            </g>
+          )}
+        </>
+      )}
+      {kind === "ride" && <path className="ride-ticket" d="M9-3h18v13H9q2-3 0-6t0-7Z" />}
+      {kind === "work" && workStyle && <WorkActivity style={workStyle} />}
+      {kind === "wait" && (
+        <path className="wait-clock" d="M19-9a9 9 0 1 0 0 18 9 9 0 1 0 0-18Zm0 4v5l4 2" />
+      )}
+      {kind === "rest" && <path className="rest-mug" d="M8 3h12v12H8Zm12 2h4v7h-4" />}
     </g>
   );
 }
@@ -581,13 +897,22 @@ function WorkActivity({ style }: { style: WorkStyle }) {
       );
   }
 }
-function PetSprite() {
+function PetSprite({ activity }: { activity: ActivityKind }) {
   return (
     <g className="pet-body">
       <ellipse cx="0" cy="3" rx="9" ry="5" />
       <circle cx="8" cy="0" r="4" />
       <path d="m10-4 3-4 1 5M-5 6v5M5 6v5" />
       <path className="pet-tail" d="M-8 4q-9-1-7-8" />
+      {activity === "rest" && (
+        <text className="pet-sleep-z" x="8" y="-10">
+          z
+        </text>
+      )}
+      {activity === "wait" && <path className="pet-wait-mark" d="M12-17v8m0 4v2" />}
+      {activity === "cleanup" && (
+        <path className="pet-cleanup-mark" d="M12-15 21 0H3Zm0 5v5m0 2v1" />
+      )}
     </g>
   );
 }

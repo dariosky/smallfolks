@@ -1,8 +1,8 @@
-# Smallfolk: evaluation and implementation plan
+# SmallFolks: evaluation and implementation plan
 
-Evaluated 2026-09-29 against [smallfolk-spec.md](smallfolk-spec.md), especially sections 2, 5–8, 11–14 and the first vertical slice in section 16.
+Evaluated 2026-09-29 and updated through 2026-09-30 against [smallfolk-spec.md](smallfolk-spec.md), especially sections 2, 5–8, 11–14 and the first vertical slice in section 16.
 
-This is a source-level evaluation with isolated, in-memory simulation probes. It is not a browser visual acceptance pass or a production assessment. The train-capacity implementation was interrupted by this planning request: the checkout contains partial backend changes and the older frontend train behaviour. Treat those changes as unfinished. This evaluation adds documentation only; implementation resumes in a following phase.
+This is a source-level evaluation with isolated simulation scenarios and frontend type/lint/build checks. It is not a browser visual acceptance pass or a production assessment. Status markers distinguish complete prerequisites from the current prototype's implemented slices; they do not turn a passing state assertion into a visual continuity guarantee.
 
 ## Assessment
 
@@ -17,29 +17,28 @@ Preserve the user's current direction: strict top-down, detailed cartoon art, bu
 | Spec area | Current evidence | Assessment |
 | --- | --- | --- |
 | App foundation | FastAPI, React/Vite, SQLModel snapshot, Alembic migrations, IDE launchers, backend 5340/frontend 5341, production HTML serving | Useful foundation; retain it |
-| Tiny fixture | Ten named people, homes/services, dog, two parked vehicles, roads and SVG town | Present, largely hand-authored |
-| Clock and controls | Browser issues minute advances; local pause; time-step buttons | Partial; multiple clock owners and mutation races |
-| Movement | Six-node pedestrian graph; route points; sprite tweening | Partial; paths and visible roads are not one geometry source |
-| Rail | Backend timetable/capacity draft; frontend independent train clock | Incomplete and inconsistent across layers |
-| Individual life | Fixed 08:00–17:00 work script and a few need values | Placeholder, not the specified decision model |
-| Inspection | Live selected-person card, activity and explanation strings | Good starting point; places/vehicles/train need real details |
+| Tiny fixture | Fifteen named people, shared households, homes/services, Pippin, two parked vehicles, roads and SVG town | Present, still hand-authored |
+| Clock and controls | Server-owned fixed-second tick, run/pause, speed, revision-safe manual advance and 250 ms observation | Implemented prototype; no event/delta stream |
+| Movement | Pedestrian route points, persisted direct-care routes and sprite tweening | Improved; schedule phases still need a universal journey executor |
+| Rail | Backend timetable/state, eight stable seats across two coaches, visible/selectable riders, local-speed access/egress | Prototype complete enough to observe; queues/doors/one geometry source remain |
+| Individual life | Work shifts, household food shopping, eating, sleeping, low-key home activities, bar/cinema choices and shared dog care | Useful vertical slice; still a conditional schedule rather than the specified planner |
+| Inspection | Live people/pet/household card, clickable household members, activity/need explanations | Good starting point; places/vehicles/train need real details |
 | Persistence | Whole-world JSON snapshot in a relational table | Saves state; no durable event history/checkpoints or world migration policy |
 | Generation | Seed recorded; fixed coordinates and population | Not procedural yet |
 | Economy/social life | No functioning accounts, transactions, relationships or memories | Missing |
 | Observation tools | Static map extent; no camera, day/night, population panel or setup UI | Missing or partial |
-| Quality | Four backend smoke/scenario tests and frontend build tooling | Does not establish behavioural correctness |
+| Quality | Twenty backend scenarios plus frontend type/lint/build tooling | Does not establish browser continuity or product acceptance |
 
 ## Findings that should drive the order
 
 ### P0 — correctness problems visible to the player
 
-1. **Train position has two owners.** `backend/simulation/tick.py::_service_state` emits scheduled distance and station state, but `frontend/src/world/TownMap.tsx::TrainLoop` ignores it. The latter uses its own elapsed clock and resets/overrides position based on passengers. This is the source of station jumps and boarding without the visible train. Backend queue wording now starts with “Queued”; the frontend still searches for “Waiting”.
-2. **Capacity is only a partial count check.** There is an eight-person backend limit but no seat registry, carriage assignment, FIFO queue or actual per-car occupancy. Frontend shows a dot for all riders in one coach. Boarding is keyed to one departure minute rather than a platform arrival/boarding event.
-3. **Overflow passengers teleport.** An in-memory probe with ten copies of Marco produced eight aboard and two queued at 07:34. At 07:43 the two people who never boarded became “Walking from Eastgate”. The itinerary advances by clock regardless of whether the previous leg completed. Waiting for the next service is not implemented.
-4. **Needs do not progress under normal playback.** `minutes // 12` and `minutes // 20` are zero for one-minute updates. A 60-minute probe left hunger/rest unchanged; bulk advances now recurse into one-minute steps, so they also lose these increments. Social need has no progression/relief loop.
-5. **Schedules can teleport people.** `_move_to` assigns destination coordinates directly for work, home and pet care. Reaching 08:00 marks people as working without checking arrival. A purchase reduces hunger immediately, then the next branch can return the person home. No coherent return journey or eating duration exists.
-6. **Rendered motion can contradict the route.** Walking estimates use place centres, movement uses offset positions, and station access uses straight-line distance at a different speed despite rendering a longer graph route. SVG/CSS position interpolation can cut corners between snapshots. Pedestrian graph edges and access legs can cross buildings or rails without designated crossings.
-7. **Clock mutation is tied to each browser.** `TownPage.tsx` sends advances on a local timer and can also send manual advances. More than one tab can advance the same world; snapshot read-modify-write has no revision check. A local pause does not establish an authoritative world pause. Train animation can keep advancing while an API update is delayed.
+1. **Journey execution is still mixed.** The server now owns the clock/train position, and recent social, pet-care and final-home routes persist from a person's actual position. The broader work/home/shop/cinema schedule still contains time-window branches that can assume a person is at an expected prior location. Replace them with one persisted-leg executor before adding more venues.
+2. **Train operations are not yet station operations.** Seats and carriage placement are stable and visible, but boarding is still clock-keyed. There are no doors, finite boarding time, FIFO queue state or honest missed-service recovery.
+3. **Train geometry is still duplicated.** The backend's rail-distance arcs and frontend SVG loop are aligned by convention rather than derived from one path. Station access/egress now uses normal walking speed and a local rendered path, but platform geometry and entrances remain approximate.
+4. **Needs now progress and have relief loops, but their policy is narrow.** Hunger triggers meals, rest triggers sleep, social need triggers bar visits and boredom can favour cinema. Their thresholds, opening hours, household availability and activity durations still need a shared tunable activity model.
+5. **Manual snapshot loading can still expose a schedule discontinuity.** Current-position routes prevent the observed bar and pet teleports, but all schedule transitions need the same arrival check. A browser route-continuity review is mandatory before calling step 1 or 4 complete.
+6. **The API is authoritative but polling-only.** Per-world revisions prevent stale mutation writes, while manual advance serializes server-side to coexist with running ticks. Keep polling until measured payload/latency evidence justifies a delta/WebSocket channel.
 
 ### P1 — foundations needed for the specified MVP
 
@@ -82,10 +81,10 @@ Preserve the user's current direction: strict top-down, detailed cartoon art, bu
 
 ### Step 0 implementation record (2026-09-29)
 
-- The known fixture remains `world:poc-9-{seed}` and its partial train work is deliberately preserved: `simulation/tick.py` publishes clock-driven service state, while `TownMap.tsx` still drives a separate animation and reads incompatible queue wording. Step 2 owns the behavioural completion; no gameplay was changed here.
+- The known fixture remains `world:poc-9-{seed}`. It has since grown into the current fifteen-resident prototype; the server clock and train state now drive the map, while step 2 retains the station-operation work.
 - Current snapshots use `world_format_version: 1`, `generation_version: "poc-9"`, `simulation_version: "poc-1"`, and a command `revision`. Format 0 (no format/revision marker) is read through an additive in-memory migration and is persisted as format 1 only after a command changes state. Unknown future and retired formats return an explained compatibility error; unsupported-save archival/export is intentionally left for step 9.
 - `simulation/contracts.py` now defines the planned JSON vocabulary. It is a type boundary, not a parallel runtime state machine: step 1 will make clock/revision authoritative and step 2 will populate train/carriage/seat/queue state.
-- Backend tests now use a per-run temporary SQLite database and apply Alembic migrations before each scenario. The known fixture is the reproducible baseline. The captured behaviour is still intentionally incomplete: scripted schedules can teleport, needs do not accumulate per normal one-minute update, and the frontend train does not follow backend train state.
+- Backend tests now use a per-run temporary SQLite database and apply Alembic migrations before each scenario. The known fixture is the reproducible baseline. The captured behaviour remains intentionally incomplete: some scripted phase transitions still need universal persisted-leg execution, and train queues are not yet modelled.
 - First acceptance scenario: create fixture seed `90111`; verify format, generation and simulation versions; advance 30 minutes; reload and verify the same clock and a revision increment. This proves snapshot identity and isolated checks only—not route or train correctness.
 
 ## Step 1 — one simulation clock and route-faithful movement
@@ -105,7 +104,7 @@ Preserve the user's current direction: strict top-down, detailed cartoon art, bu
 
 - The server tick is deliberately polling-based for this small POC: a WebSocket is not needed to make the authoritative clock smooth. The app sends no browser advance timer; it observes a running world every 250 ms. A later event/delta channel can replace polling without changing the clock contract.
 - `simulation.elapsed_seconds`, `presentation_time_seconds`, `running` and `speed` are persisted in the snapshot. The server advances 15 logical seconds per 250 ms at speed 1, scales that step by speed, and persists a new revision. Existing format-0 saves receive a stopped simulation state on load.
-- Journey objects now accompany the existing walk/train route data as an interim persisted contract. The current route graph and schedule still need the step’s full leg-completion/replanning rewrite, so this step is not yet complete.
+- Journey objects now accompany the existing walk/train route data as an interim persisted contract. Direct routes are persisted for pet care, return-home and social/cinema recovery from an unexpected current position; the current route graph and schedule still need the step’s full leg-completion/replanning rewrite, so this step is not yet complete.
 
 ## Step 2 — finish the train, queues and visible passengers
 
@@ -120,6 +119,12 @@ Preserve the user's current direction: strict top-down, detailed cartoon art, bu
 - [ ] Align platform geometry with coach doors, queue slots and safe pedestrian access. Render boarding/alighting at the same presentation time as train arrival/departure so network interpolation cannot make people vanish early.
 
 **Done when:** a ten-person crowd fills eight seats, leaves two visible on the platform, and boards those two on a later service. The train takes the same path/timing in an empty-world run. Each rider is visible in a stable seat, alights only at their stop, and survives save/reload while aboard. Verify this in the browser, not only by inspecting state.
+
+### Step 2 progress record (2026-09-30)
+
+- The frontend no longer owns a train clock: it renders the server's scheduled rail distance and shows individual, selectable riders in stable carriage/seat slots. The two passenger coaches hold four people each.
+- Train access and egress use the normal walking speed. A commuter remains on the final local station leg after the nominal shift time instead of being snapped to work.
+- This does **not** complete step 2: there is no persisted station queue, real stop/door/boarding state, finite boarding time or later-service overflow recovery. The next train task is the ten-person crowd acceptance scenario, not more visual polish.
 
 ## Step 3 — connected town geometry and trustworthy journey estimates
 
@@ -147,6 +152,11 @@ Preserve the user's current direction: strict top-down, detailed cartoon art, bu
 
 **Done when:** watch breakfast → commute → work → shop → home → dinner/sleep over a full day, with a pet walk, no unexplained relocations, changing needs and intelligible decisions. Replaying the same saved starting state yields the same results.
 
+### Step 4 prototype progress (2026-09-30)
+
+- Implemented slices: shared household food servings and alternating grocery shoppers; shopping duration proportional to servings; moving shoppers; meal-driven hunger relief; sleep-driven rest relief; at-home reading/gardening/calls/chores/hobbies; boredom/social-driven bar or cinema choices; evening bar/cinema staffing; shared household dog care with a 12-hour walk autonomy, proactive walk, accident cleanup and rotating owners.
+- These slices are deliberately not marked complete. They still run through a conditional schedule instead of commitments and general activities, and household food is not yet an inventory/transaction model. The next implementation should extract the existing decisions into persisted activities and make every transition arrival-gated.
+
 ## Step 5 — make the world readable and visually convincing
 
 **Depends on:** 4; preserve small visual improvements made for train acceptance earlier.
@@ -159,6 +169,11 @@ Preserve the user's current direction: strict top-down, detailed cartoon art, bu
 - [ ] Show pause/speed, loading/reconnect/errors and current world selection clearly. Make failed time advances visible and recoverable.
 
 **Done when:** the user can follow a person from home into a visibly occupied coach and into work without losing identity or context, at both street and town zoom. Review screenshots and a full browser journey, including pause and resize.
+
+### Step 5 prototype progress (2026-09-30)
+
+- Implemented visual slices: interpolated map updates, visible groceries, beer/social animation, role-specific work marks, eating and sleep indicators, reduced-motion handling, clickable household members and selectable train riders.
+- The next visual acceptance work remains pan/zoom/follow, place/train inspectors, day/night, a browser continuity pass, and correcting any route that still appears to snap under real running playback.
 
 ## Step 6 — generate a coherent 30–100-person town
 
@@ -232,4 +247,9 @@ Keep a small number of scenarios that target actual failure modes:
 
 Run relevant backend checks and frontend type/lint/build for each affected slice; use browser observation for train occupancy, continuity, camera and animation. Do not count a passing compile or an activity label assertion as proof that the scenario works.
 
-**Recommended next implementation:** step 0, then steps 1 and 2 as the first coherent milestone. Its demonstration is simple: the same train follows the same route whether anyone is waiting or not, people board only during a real station stop, and the user can see every occupied seat.
+## Recommended next implementation
+
+1. Finish the remaining step 1/3 movement seam: route every transition from the entity's current logical position, persist legs, and make arrival—not a wall-clock branch—the only way to begin work, shopping, cinema, bar, sleep or home activity.
+2. Finish step 2's station model: platform queue slots, alight-before-board, doors/boarding duration and later-service overflow recovery. Demonstrate a ten-person crowd filling eight seats while two remain visibly queued.
+3. Convert the step 4 prototype slices into typed commitments/activities with explicit duration, opening hours and effects. Preserve household food and dog-care behaviour while making it reproducible and inspectable.
+4. Run the first browser acceptance pass from step 5: pause/resume, a full train trip, social/cinema outing, dog walk, large manual advance and two-tab observation. Record any remaining visual discontinuity before expanding generation or economy.

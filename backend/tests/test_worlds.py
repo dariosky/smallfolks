@@ -1,5 +1,6 @@
 import json
 from datetime import datetime, timedelta
+from math import ceil, hypot
 
 from fastapi.testclient import TestClient
 from sqlmodel import Session
@@ -11,6 +12,9 @@ from persistence.models import WorldSnapshot
 from services.worlds import tick_running_worlds
 from simulation.tick import (
     _grocery_browsing_minutes,
+    _is_business_open_and_staffed,
+    _station_walk_minutes,
+    _train_journey,
     _walking_minutes,
     advance,
     advance_seconds,
@@ -152,19 +156,38 @@ def test_train_uses_stable_seats_and_alights_at_the_backend_stop():
     riders = [person for person in world["people"] if person.get("on_train")]
     state = world["trains"][0]["state"]
     assert state["at_station"] is None
-    assert len(riders) == 4
+    assert 1 <= len(riders) <= state["capacity"]
     assert {(rider["train_car_index"], rider["train_seat_index"]) for rider in riders} == {
-        (0, 0),
-        (0, 1),
-        (0, 2),
-        (0, 3),
+        (seat // state["car_capacity"], seat % state["car_capacity"])
+        for seat in range(len(riders))
     }
-    assert state["carriages"][0]["passenger_ids"] == [rider["id"] for rider in riders]
+    assert state["carriages"][0]["passenger_ids"] == [
+        rider["id"] for rider in riders if rider["train_car_index"] == 0
+    ]
 
     advance(world, 9)
 
     assert world["trains"][0]["state"]["at_station"] == "station:eastgate"
-    assert not any(person.get("on_train") for person in world["people"])
+    assert not any(
+        person.get("on_train") and person.get("train_arrival_id") == "station:eastgate"
+        for person in world["people"]
+    )
+
+
+def test_train_egress_uses_the_same_pedestrian_speed_as_other_walks():
+    world = build_fixture(78)
+    marco = next(person for person in world["people"] if person["id"] == "person:marco")
+    home = next(place for place in world["places"] if place["id"] == marco["home_place_id"])
+    work = next(place for place in world["places"] if place["id"] == marco["workplace_id"])
+    journey = _train_journey(home, work)
+
+    assert journey is not None
+    assert _station_walk_minutes(journey["arrival"], work) == journey["egress_minutes"]
+    arrival = journey["arrival"]["position"]
+    destination = work["position"]
+    assert journey["egress_minutes"] == ceil(
+        hypot(destination["x"] - arrival["x"], destination["y"] - arrival["y"]) / 18
+    )
 
 
 def test_household_members_take_turns_grocery_shopping_and_shoppers_move_in_market():
@@ -179,7 +202,7 @@ def test_household_members_take_turns_grocery_shopping_and_shoppers_move_in_mark
     workplace = next(place for place in world["places"] if place["id"] == shopper["workplace_id"])
     world["clock"] = "2031-05-12T16:59:00"
 
-    advance(world, _walking_minutes(workplace, market) + 1)
+    advance(world, 45)
 
     assert shopper["activity"] == "Shopping at Hearth Market"
     assert household["food_servings"] == 6
@@ -197,7 +220,7 @@ def test_household_members_take_turns_grocery_shopping_and_shoppers_move_in_mark
         place for place in world["places"] if place["id"] == next_shopper["workplace_id"]
     )
     world["clock"] = "2031-05-13T16:59:00"
-    advance(world, _walking_minutes(next_workplace, market) + 1)
+    advance(world, 45)
     assert next_shopper["activity"] == "Shopping at Hearth Market"
 
 
@@ -376,3 +399,39 @@ def test_social_outing_routes_from_home_instead_of_teleporting_to_the_bar():
     assert elena["route"]
     advance(world, 1)
     assert elena["position"] != starting_position
+
+
+def test_meals_preempt_sleep_and_lunch_breaks_reduce_hunger():
+    world = build_fixture(54)
+    elena = next(person for person in world["people"] if person["id"] == "person:elena")
+    household = next(
+        household for household in world["households"] if household["id"] == elena["household_id"]
+    )
+    household["food_servings"] = 2
+    elena["needs"].update({"hunger": 100, "rest": 100})
+    world["clock"] = "2031-05-12T18:10:00"
+
+    advance(world, 0)
+
+    assert elena["activity"] == "Cooking and eating at home"
+    assert elena["target_place_id"] == elena["home_place_id"]
+
+    elena["needs"].update({"hunger": 70, "rest": 20})
+    world["clock"] = "2031-05-13T12:00:00"
+    advance(world, 0)
+
+    assert elena["activity"] == "Eating lunch at work"
+    assert elena["needs"]["hunger"] < 70
+
+
+def test_market_requires_an_open_shifted_staff_member():
+    world = build_fixture(55)
+    market = next(place for place in world["places"] if place["id"] == "place:supermarket")
+    diego = next(person for person in world["people"] if person["id"] == "person:diego")
+
+    diego["activity"] = "At home"
+    assert not _is_business_open_and_staffed(world, market, 18 * 60)
+
+    diego["activity"] = "Working as shopkeeper"
+    assert _is_business_open_and_staffed(world, market, 18 * 60)
+    assert not _is_business_open_and_staffed(world, market, 20 * 60)

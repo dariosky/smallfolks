@@ -160,9 +160,23 @@
   filter: brightness(1.08) drop-shadow(0 3px 0 #fef8e6);
   outline: none;
 }
+.town-map .place-home:focus {
+  outline: none;
+}
 .town-map .place-hit {
   fill: transparent !important;
   stroke: none !important;
+}
+.town-map .house-selection rect {
+  fill: none;
+}
+.town-map .house-selection-halo {
+  stroke: #fffdf0;
+  stroke-width: 8;
+}
+.town-map .house-selection-ring {
+  stroke: #1262c6;
+  stroke-width: 4;
 }
 .town-map .place-selected .house-shadow,
 .town-map .place-selected .park-lawn {
@@ -444,9 +458,10 @@
 .town-map .map-entity {
   transition: transform 0.25s linear;
 }
-.town-map .entity-hit {
+.town-map .map-entity .entity-hit {
   fill: transparent;
   stroke: none;
+  pointer-events: all;
 }
 .town-map .entity-shadow {
   fill: #497b68;
@@ -652,5 +667,631 @@
   }
   .time-controls button {
     transition: none;
+  }
+}
+
+/* Each resident keeps a seeded appearance while their activity changes. */
+.town-map .map-entity .person-head {
+  fill: var(--skin);
+}
+.town-map .map-entity .person-hair {
+  fill: var(--hair);
+  stroke: #4f4742;
+  stroke-width: 0.8;
+}
+.town-map .map-entity .person-torso,
+.town-map .map-entity .person-skirt {
+  fill: var(--outfit);
+  stroke: var(--outfit-dark);
+  stroke-width: 1.3;
+}
+.town-map .person-skirt {
+  stroke-linejoin: round;
+}
+.town-map .person-glasses {
+  fill: none;
+  stroke: #506366;
+  stroke-width: 1.1;
+}
+.town-map .person-freckles {
+  stroke: #9b654e;
+  stroke-width: 1.1;
+  stroke-linecap: round;
+}
+.town-map .person-sleep-face {
+  fill: none;
+  stroke: #735346;
+  stroke-width: 1.2;
+  stroke-linecap: round;
+}
+.town-map .activity-badge rect {
+  fill: #fff9e9;
+  stroke: #567269;
+  stroke-width: 1.5;
+  filter: drop-shadow(1px 2px 0 #7e9e86);
+}
+.town-map .activity-badge text {
+  fill: #334e4b;
+  font:
+    900 9px Georgia,
+    serif;
+  text-anchor: middle;
+  paint-order: normal;
+  stroke: none;
+}
+.town-map .activity-badge.is-highlighted rect {
+  fill: #ffdc98;
+  stroke: #c56855;
+  stroke-width: 2;
+}
+.town-map .activity-badge {
+  transition: transform 0.25s ease;
+}
+.town-map .map-entity:hover .activity-badge,
+.town-map .map-entity:focus-visible .activity-badge {
+  transform: translate(0, -45px);
+}
+.town-map .map-entity:focus-visible {
+  outline: none;
+  filter: drop-shadow(0 0 4px #f9d983);
+}
+.town-map .map-entity.activity-sleep .person-body {
+  animation: sleep-breathe 2.7s ease-in-out infinite alternate;
+  transform-origin: center;
+}
+.town-map .sleep-bed rect:first-child {
+  fill: #bb94ab;
+  stroke: #675b6a;
+  stroke-width: 2;
+}
+.town-map .sleep-bed .sleep-pillow {
+  fill: #f9e5c3;
+  stroke: #675b6a;
+  stroke-width: 1;
+}
+.town-map .sleep-blanket {
+  fill: #8faec8;
+  stroke: #52687b;
+  stroke-width: 1.8;
+}
+.town-map .sleep-z {
+  fill: #6b759f;
+  font:
+    900 9px Georgia,
+    serif;
+  animation: float-z 2s ease-in-out infinite;
+}
+.town-map .map-entity.activity-sleep .person-body {
+  transform: rotate(-75deg) translate(-1px, -2px);
+}
+.town-map .prop-read .prop-book,
+.town-map .work-book {
+  fill: #fff4cc;
+  stroke: #557283;
+  stroke-width: 1.7;
+  stroke-linejoin: round;
+}
+.town-map .book-lines {
+  fill: none;
+  stroke: #d39a72;
+  stroke-width: 0.8;
+}
+.town-map .prop-read .prop-book {
+  transform-origin: 11px 10px;
+  animation: book-tilt 2.4s ease-in-out infinite alternate;
+}
+.town-map .prop-garden .prop-watering-can {
+  fill: #7db8bb;
+  stroke: #486d73;
+  stroke-width: 1.7;
+  stroke-linejoin: round;
+  transform-origin: 10px 8px;
+  animation: water-tip 1.9s ease-in-out infinite alternate;
+}
+.town-map .garden-drops {
+  fill: none;
+  stroke: #72bcc8;
+  stroke-width: 2;
+  stroke-linecap: round;
+  animation: drops-fall 1.9s ease-in infinite;
+}
+.town-map .garden-sprout {
+  fill: none;
+  stroke: #5b9b5c;
+  stroke-width: 2;
+  stroke-linecap: round;
+}
+.town-map .prop-phone {
+  fill: #5e7899;
+  stroke: #3d5572;
+  stroke-width: 1.4;
+  transform-origin: 10px 0;
+  animation: phone-rock 2.2s ease-in-out infinite alternate;
+}
+.town-map .phone-signal {
+  fill: none;
+  stroke: #83a1c4;
+  stroke-width: 1.4;
+  animation: signal-pulse 1.2s ease-in-out infinite;
+}
+.town-map .prop-broom {
+  fill: #cf9f65;
+  stroke: #85634b;
+  stroke-width: 1.7;
+  stroke-linejoin: round;
+  transform-origin: 16px -15px;
+  animation: broom-sweep 0.85s ease-in-out infinite alternate;
+}
+.town-map .chores-sparkle {
+  fill: none;
+  stroke: #efc069;
+  stroke-width: 1.5;
+  animation: signal-pulse 0.85s infinite alternate;
+}
+.town-map .prop-canvas {
+  fill: #fff4dd;
+  stroke: #5d7a76;
+  stroke-width: 1.7;
+}
+.town-map .canvas-doodle {
+  fill: none;
+  stroke: #e9837d;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-dasharray: 18;
+  animation: hobby-draw 2.5s ease-in-out infinite alternate;
+}
+.town-map .prop-brush {
+  fill: none;
+  stroke: #9b704e;
+  stroke-width: 2;
+  stroke-linecap: round;
+  transform-origin: 7px 13px;
+  animation: brush-paint 1.1s ease-in-out infinite alternate;
+}
+.town-map .plate-food {
+  fill: #edb867;
+  stroke: #b7814f;
+  stroke-width: 1;
+}
+.town-map .steam-lines {
+  fill: none;
+  stroke: #d7a17b;
+  stroke-width: 1.2;
+  stroke-linecap: round;
+  animation: float-z 1.5s ease-in-out infinite;
+}
+.town-map .prop-basket {
+  fill: #d59c62;
+  stroke: #855f46;
+  stroke-width: 1.6;
+  stroke-linejoin: round;
+  transform-origin: 12px 6px;
+  animation: basket-swing 0.8s ease-in-out infinite alternate;
+}
+.town-map .basket-produce {
+  fill: #91bc72;
+  stroke: #6f915a;
+  stroke-width: 1;
+}
+.town-map .prop-screen {
+  fill: #fff4dc;
+  stroke: #53677e;
+  stroke-width: 2;
+}
+.town-map .screen-play {
+  fill: #e27a74;
+  stroke: #a35b63;
+  stroke-width: 1;
+}
+.town-map .screen-rays {
+  fill: none;
+  stroke: #f4cc76;
+  stroke-width: 1.5;
+  animation: screen-flicker 1.6s steps(2) infinite;
+}
+.town-map .social-chatter {
+  fill: #fff0ce;
+  stroke: #d29073;
+  stroke-width: 1.3;
+  animation: social-bounce 1.3s ease-in-out infinite alternate;
+}
+.town-map .prop-social .beer-glass {
+  transform-origin: 10px 13px;
+  animation: beer-toast 1.35s ease-in-out infinite alternate;
+}
+.town-map .walking-trail {
+  fill: none;
+  stroke: #ba936c;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-dasharray: 2 3;
+  animation: route-march 0.6s linear infinite;
+}
+.town-map .ride-ticket {
+  fill: #fbe3a5;
+  stroke: #967547;
+  stroke-width: 1.5;
+}
+.town-map .wait-clock {
+  fill: #fff8dc;
+  stroke: #6b8985;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+}
+.town-map .rest-mug {
+  fill: #f4d9a6;
+  stroke: #8b684e;
+  stroke-width: 1.5;
+}
+.town-map .pet-body {
+  animation: dog-bob 1s ease-in-out infinite alternate;
+}
+.town-map .pet.activity-wait .pet-body {
+  animation: dog-bob 0.55s ease-in-out infinite alternate;
+}
+.town-map .pet.activity-rest .pet-body {
+  animation: sleep-breathe 2.5s ease-in-out infinite alternate;
+}
+@keyframes sleep-breathe {
+  from {
+    transform: rotate(-75deg) translate(-1px, -2px) scale(1);
+  }
+  to {
+    transform: rotate(-75deg) translate(-1px, -2px) scale(1.05);
+  }
+}
+@keyframes float-z {
+  to {
+    transform: translateY(-6px);
+    opacity: 0.35;
+  }
+}
+@keyframes book-tilt {
+  to {
+    transform: rotate(-8deg);
+  }
+}
+@keyframes water-tip {
+  to {
+    transform: rotate(-22deg);
+  }
+}
+@keyframes drops-fall {
+  to {
+    transform: translate(0, 5px);
+    opacity: 0.25;
+  }
+}
+@keyframes phone-rock {
+  to {
+    transform: rotate(9deg);
+  }
+}
+@keyframes signal-pulse {
+  to {
+    opacity: 0.25;
+  }
+}
+@keyframes broom-sweep {
+  to {
+    transform: rotate(17deg);
+  }
+}
+@keyframes hobby-draw {
+  to {
+    stroke-dashoffset: 12;
+  }
+}
+@keyframes brush-paint {
+  to {
+    transform: rotate(12deg);
+  }
+}
+@keyframes basket-swing {
+  to {
+    transform: rotate(-10deg);
+  }
+}
+@keyframes screen-flicker {
+  to {
+    opacity: 0.35;
+  }
+}
+@keyframes social-bounce {
+  to {
+    transform: translateY(-4px);
+  }
+}
+.town-map .train-passenger circle {
+  fill: var(--skin);
+}
+.town-map .train-passenger path:not(.train-passenger-hair) {
+  fill: var(--outfit);
+}
+.town-map .train-passenger .train-passenger-hair {
+  fill: var(--hair);
+  stroke: #4f4742;
+  stroke-width: 0.5;
+}
+.town-map .pet-sleep-z {
+  fill: #697da7;
+  stroke: none;
+  font:
+    900 10px Georgia,
+    serif;
+  animation: float-z 2s ease-in-out infinite;
+}
+.town-map .pet-wait-mark {
+  fill: none;
+  stroke: #dc8f60;
+  stroke-width: 3;
+  stroke-linecap: round;
+  animation: signal-pulse 0.8s ease-in-out infinite alternate;
+}
+.town-map .pet-cleanup-mark {
+  fill: #ffe2a0;
+  stroke: #9a6a4e;
+  stroke-width: 1.6;
+}
+.town-map .map-entity.activity-walk .person-body {
+  animation: person-bob 0.42s ease-in-out infinite alternate;
+}
+.town-map .map-entity.activity-walk .leg-left {
+  transform-origin: -4px 10px;
+  animation: leg-step 0.55s ease-in-out infinite alternate;
+}
+.town-map .map-entity.activity-walk .leg-right {
+  transform-origin: 4px 10px;
+  animation: leg-step 0.55s ease-in-out infinite alternate-reverse;
+}
+.town-map .map-entity.activity-eat .breakfast-spoon {
+  transform-origin: 7px 5px;
+  animation: breakfast-bite 1.1s ease-in-out infinite alternate;
+}
+.town-map .map-entity.activity-wait .wait-clock {
+  animation: signal-pulse 1.4s ease-in-out infinite alternate;
+}
+.town-map .map-entity.activity-rest .rest-mug {
+  animation: social-bounce 2.5s ease-in-out infinite alternate;
+}
+
+/* Little landmarks make each workplace recognizable at map scale. */
+.town-map .landmark {
+  pointer-events: none;
+}
+.town-map .landmark path {
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.town-map .clinic-sign {
+  fill: #e5f5df;
+  stroke: #4f8e70;
+  stroke-width: 2.5;
+}
+.town-map .clinic-cross {
+  fill: #64b887;
+  stroke: #317c62;
+  stroke-width: 1.3;
+}
+.town-map .clinic-window {
+  fill: none;
+  stroke: #65a88b;
+  stroke-width: 2;
+}
+.town-map .school-belfry {
+  fill: #f2d18e;
+  stroke: #6f6256;
+  stroke-width: 2;
+}
+.town-map .school-clock {
+  fill: #fff6d9;
+  stroke: #6f6256;
+  stroke-width: 2;
+}
+.town-map .school-hands {
+  fill: none;
+  stroke: #6f6256;
+  stroke-width: 1.5;
+}
+.town-map .school-board {
+  fill: #477f6d;
+  stroke: #365e53;
+  stroke-width: 1.5;
+}
+.town-map .school-letters {
+  fill: #fff6d9;
+  stroke: none;
+  font:
+    700 5px Georgia,
+    serif;
+  text-anchor: middle;
+}
+.town-map .bar-bracket {
+  fill: none;
+  stroke: #57485b;
+  stroke-width: 2;
+}
+.town-map .bar-lantern {
+  transform-origin: 37px -19px;
+  animation: lantern-sway 3s ease-in-out infinite alternate;
+}
+.town-map .bar-lantern > path:first-child {
+  fill: #f6cb79;
+  stroke: #57485b;
+  stroke-width: 2;
+}
+.town-map .bar-flame {
+  fill: #f29157;
+  stroke: #b46657;
+  stroke-width: 1;
+  animation: lantern-glow 1.5s ease-in-out infinite alternate;
+}
+.town-map .bar-table {
+  fill: none;
+  stroke: #7f5a57;
+  stroke-width: 2;
+}
+.town-map .cinema-reel {
+  fill: #495b70;
+  stroke: #35485d;
+  stroke-width: 2;
+}
+.town-map .cinema-reel-holes {
+  fill: none;
+  stroke: #f7dfb1;
+  stroke-width: 3.5;
+  stroke-linecap: round;
+}
+.town-map .cinema-marquee {
+  fill: #ffe2a0;
+  stroke: #915867;
+  stroke-width: 2.2;
+}
+.town-map .cinema-word {
+  fill: #734a5d;
+  stroke: none;
+  font:
+    900 8px Georgia,
+    serif;
+  text-anchor: middle;
+  letter-spacing: 0.08em;
+}
+.town-map .cinema-bulbs {
+  fill: none;
+  stroke: #fff9c9;
+  stroke-width: 3;
+  stroke-linecap: round;
+  animation: cinema-twinkle 1.8s steps(2) infinite;
+}
+.town-map .post-plaque {
+  fill: #f3e8c8;
+  stroke: #516e88;
+  stroke-width: 2.2;
+}
+.town-map .post-envelope {
+  fill: #fffaf0;
+  stroke: #d4716a;
+  stroke-width: 1.5;
+}
+.town-map .post-box {
+  fill: #d76d68;
+  stroke: #874f55;
+  stroke-width: 1.8;
+}
+.town-map .library-pediment {
+  fill: #e5ceaa;
+  stroke: #5f6267;
+  stroke-width: 2.1;
+}
+.town-map .library-book {
+  fill: #fff6d9;
+  stroke: #5a6a78;
+  stroke-width: 1.5;
+}
+.town-map .library-columns,
+.town-map .townhall-columns {
+  fill: none;
+  stroke: #f7e7c3;
+  stroke-width: 3.3;
+}
+.town-map .townhall-flagpole {
+  fill: none;
+  stroke: #596d69;
+  stroke-width: 1.8;
+}
+.town-map .townhall-flag {
+  fill: #e78672;
+  stroke: #965b59;
+  stroke-width: 1.2;
+  animation: flag-wave 2.3s ease-in-out infinite alternate;
+}
+.town-map .workshop-gear {
+  fill: #b8d2d1;
+  stroke: #52646c;
+  stroke-width: 2;
+  stroke-dasharray: 2 1;
+}
+.town-map .workshop-gear-centre {
+  fill: #f2d6a4;
+  stroke: #52646c;
+  stroke-width: 1.3;
+}
+.town-map .workshop-wrench {
+  fill: none;
+  stroke: #697985;
+  stroke-width: 3;
+}
+.town-map .bakery-loaf {
+  fill: #e6a35d;
+  stroke: #8d5d40;
+  stroke-width: 2;
+}
+.town-map .bakery-cuts {
+  fill: none;
+  stroke: #fff0c2;
+  stroke-width: 1.7;
+}
+.town-map .market-crate {
+  fill: #ad794d;
+  stroke: #755943;
+  stroke-width: 1.8;
+}
+.town-map .market-fruit {
+  fill: #f39b68;
+  stroke: #a56551;
+  stroke-width: 1;
+}
+.town-map .market-fruit:nth-of-type(2) {
+  fill: #8abd73;
+  stroke: #648457;
+}
+.town-map .florist-pot {
+  fill: #e5a87e;
+  stroke: #936c5c;
+  stroke-width: 1.8;
+}
+.town-map .florist-stems {
+  fill: none;
+  stroke: #518d63;
+  stroke-width: 2;
+}
+.town-map .florist-bloom {
+  fill: #ec8ca1;
+  stroke: #a66878;
+  stroke-width: 1;
+}
+.town-map .florist-bloom:nth-of-type(2) {
+  fill: #f2cf77;
+  stroke: #b38f5a;
+}
+.town-map .florist-bloom:nth-of-type(3) {
+  fill: #b792ca;
+  stroke: #8e729b;
+}
+.town-map .generic-star {
+  fill: none;
+  stroke: #5a746b;
+  stroke-width: 2;
+}
+@keyframes lantern-sway {
+  to {
+    transform: rotate(7deg);
+  }
+}
+@keyframes lantern-glow {
+  to {
+    fill: #ffe8a0;
+    filter: drop-shadow(0 0 3px #ffe6a1);
+  }
+}
+@keyframes cinema-twinkle {
+  to {
+    opacity: 0.35;
+  }
+}
+@keyframes flag-wave {
+  to {
+    transform: skewY(7deg);
   }
 }

@@ -1,38 +1,24 @@
-# Smallfolk
+# SmallFolks
 
-A calm, inspectable city-life simulation. This first POC is a deliberately small,
-fixed-seed town: ten residents, homes, workplace and shop places, Pippin the dog,
-two parked vehicles, scripted placeholder activities, and an inspectable decision
-trace. The partial `poc-9` train work is intentionally unfinished: backend service
-state and the frontend animation do not yet share one contract.
+**A connected town with lives in motion.** SmallFolks is a small, inspectable life simulator. Watch neighbours move between homes, work, shops and shared spaces as the town clock runs. Select a person, pet or place to see what is happening and, for residents, why they chose their current activity.
 
-## Stack
+![The SmallFolks town and Elena Rossi's activity inspector](docs/images/smallfolks-town.png)
 
-- FastAPI
-- SQLModel
-- Alembic
-- PostgreSQL
-- React
-- Vite
+The current prototype is a fixed town with fifteen residents, households, a dog, local businesses and a railway. You can pause the simulation or advance its clock by 15 minutes or an hour. The world is saved by the Python backend; the React frontend draws the town and its live activity. Procedural town generation and a broader economy are future work.
 
-## Local development
+## Run locally
 
-### Backend (port 5340)
+Requires Python 3.13, [uv](https://docs.astral.sh/uv/) and Node.js with npm. From the repository root, install the backend dependencies and apply its database migrations:
 
 ```bash
 uv sync --group dev
 cd backend
+test -e .env || cp .env.example .env
+../.venv/bin/alembic upgrade head
 ../.venv/bin/python run_dev.py
 ```
 
-Before the first backend run, apply the schema migrations:
-
-```bash
-cd backend
-../.venv/bin/alembic upgrade head
-```
-
-### Frontend (port 5341)
+In another terminal, start the frontend:
 
 ```bash
 cd frontend
@@ -40,58 +26,8 @@ npm install
 npm run dev
 ```
 
-## Environment
+Open [http://127.0.0.1:5341/](http://127.0.0.1:5341/). The frontend proxies API requests to the backend on port 5340. The local backend uses SQLite by default.
 
-The backend reads configuration from `backend/.env`. The starter generates local
-defaults for:
+## Project notes
 
-- `ENVIRONMENT`
-- `SESSION_SECRET_KEY`
-- `DATABASE_URL`
-- `BASE_URL`
-- `API_PREFIX`
-- `CORS_ORIGINS`
-- `SITE_NAME`
-- `ENABLE_HTML_SERVING`
-
-The Vite dev server proxies `/api` to the backend. In production, FastAPI serves
-the compiled `frontend/dist` bundle when `ENABLE_HTML_SERVING=true`.
-
-## POC API and save compatibility
-
-- `GET /api/worlds` lists saved world metadata, including `world_format_version`; `POST /api/worlds` creates (or reloads) the deterministic fixed-seed fixture.
-- `POST /api/worlds/{id}/advance` advances its authoritative clock and saves it.
-- `GET /api/worlds/{id}/render-state`, `/entities/{id}`, and `/events` power the map and inspector.
-
-SQLite is used for this POC's durable snapshot so it starts without external
-services. SQLModel owns the persistence model and Alembic owns its schema
-migration. The environment structure remains ready for a PostgreSQL URL before
-the broader relational entity/event schema arrives.
-
-Snapshots carry three independent compatibility markers: `world_format_version`
-describes the JSON shape, `generation_version` identifies the town generator, and
-`simulation_version` identifies behaviour rules. Format-0 snapshots (the original
-POC shape with no format/revision fields) are loaded additively as format 1 and are
-only rewritten after a state-changing command. A future/removed format is rejected
-with HTTP 409 and an explanation; it is never silently reset or overwritten.
-
-The current format also has a command `revision`; each successful advance increments
-it. It is groundwork for stale-write rejection in step 1, not concurrency control yet.
-
-## Checks
-
-```bash
-.venv/bin/pytest backend/tests
-cd frontend && npm run lint && npm run build
-```
-
-The backend test suite creates a temporary SQLite database, applies Alembic
-migrations to it, and deletes it afterward. It does not read or write the database
-configured in `backend/.env`.
-
-## Next phases
-
-1. Add generated blocks, parcels, and validated pedestrian/road graphs from a town brief.
-2. Replace the fixed schedule with needs, commitments, routes, and explainable choices.
-3. Add full relational persistence, migrations, events/checkpoints, and save slots.
-4. Introduce economy, vehicles/rail, pets, relationships, and simulation LOD.
+The [product and technical specification](docs/smallfolk-spec.md) describes the intended simulation. The [implementation plan](docs/next-steps.md) tracks what the prototype covers and what still needs work.
