@@ -1806,3 +1806,20 @@
   .town-map .planting-sow, .town-map .planting-seed { opacity: 0; }
   .town-map .planting-water, .town-map .planting-sapling { opacity: 1; }
 }
+
+/* At overview scale these details are too small to read. Keep movement
+   transitions, walking gait, gate state and selected resident animations active. */
+.town-map:is(.is-overview, .is-dense) .map-entity:not(.is-selected):not(.activity-walk) *,
+.town-map:is(.is-overview, .is-dense) .river-ripples,
+.town-map:is(.is-overview, .is-dense) .sun-doodle,
+.town-map:is(.is-overview, .is-dense) .chimney-smoke,
+.town-map:is(.is-overview, .is-dense) .tree-crown,
+.town-map:is(.is-overview, .is-dense) .fountain-jet,
+.town-map:is(.is-overview, .is-dense) .landmark * {
+  animation-play-state: paused !important;
+}
+
+/* Bound decorative animation work in large cities even at close zoom. */
+.town-map.is-dense .map-entity:not(.is-selected):not(.activity-walk) * {
+  animation-play-state: paused !important;
+}

@@ -1,4 +1,13 @@
-import { useEffect, useRef, useState, type CSSProperties, type KeyboardEvent } from "react";
+import { usePageVisible } from "../hooks/usePageVisible";
+import {
+  memo,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type CSSProperties,
+  type KeyboardEvent,
+} from "react";
 import "./sketch.css";
 import { MansionGate } from "./MansionGate";
 
@@ -28,7 +37,16 @@ function activate(event: KeyboardEvent<SVGGElement>, action: () => void) {
   }
 }
 
-export function TownMap({ world, selectedId, onSelect, zoom = 1, position, onPositionChange, onCameraChange }: Props) {
+export function TownMap({
+  world,
+  selectedId,
+  onSelect,
+  zoom = 1,
+  position,
+  onPositionChange,
+  onCameraChange,
+}: Props) {
+  const pageVisible = usePageVisible();
   const svgRef = useRef<SVGSVGElement>(null);
   const [viewport, setViewport] = useState<{ width: number; height: number } | null>(null);
   const [localPan, setPan] = useState({ x: 0, y: 0 });
@@ -69,13 +87,14 @@ export function TownMap({ world, selectedId, onSelect, zoom = 1, position, onPos
     if (!svg) return;
     const handleWheel = (event: WheelEvent) => {
       event.preventDefault();
-      const deltaUnit = event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? viewportSize.height : 1;
+      const deltaUnit =
+        event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? viewportSize.height : 1;
       const dx = event.deltaX * deltaUnit;
       const dy = event.deltaY * deltaUnit;
       if (event.ctrlKey) {
         if (!onCameraChange) return;
         const nextZoom = Math.max(1, Math.min(4, zoom * Math.exp(-dy * 0.01)));
-        const nextScale = scale * nextZoom / zoom;
+        const nextScale = (scale * nextZoom) / zoom;
         const rect = svg.getBoundingClientRect();
         const offsetX = event.clientX - rect.left - rect.width / 2;
         const offsetY = event.clientY - rect.top - rect.height / 2;
@@ -84,8 +103,14 @@ export function TownMap({ world, selectedId, onSelect, zoom = 1, position, onPos
         onCameraChange({
           zoom: nextZoom,
           position: {
-            x: Math.max(-nextLimitX, Math.min(nextLimitX, panX + offsetX / scale - offsetX / nextScale)),
-            y: Math.max(-nextLimitY, Math.min(nextLimitY, panY + offsetY / scale - offsetY / nextScale)),
+            x: Math.max(
+              -nextLimitX,
+              Math.min(nextLimitX, panX + offsetX / scale - offsetX / nextScale),
+            ),
+            y: Math.max(
+              -nextLimitY,
+              Math.min(nextLimitY, panY + offsetY / scale - offsetY / nextScale),
+            ),
           },
         });
       } else {
@@ -100,8 +125,46 @@ export function TownMap({ world, selectedId, onSelect, zoom = 1, position, onPos
     // A native non-passive listener keeps touchpad gestures on the map.
     svg.addEventListener("wheel", handleWheel, { passive: false });
     return () => svg.removeEventListener("wheel", handleWheel);
-  }, [zoom, scale, panX, panY, limitX, limitY, mapSize.width, framedSize.height,
-    viewportSize.width, viewportSize.height, onPositionChange, onCameraChange]);
+  }, [
+    zoom,
+    scale,
+    panX,
+    panY,
+    limitX,
+    limitY,
+    mapSize.width,
+    framedSize.height,
+    viewportSize.width,
+    viewportSize.height,
+    onPositionChange,
+    onCameraChange,
+  ]);
+  const peopleById = useMemo(
+    () => new Map(world.people.map((person) => [person.id, person])),
+    [world.people],
+  );
+  const activeHomes = useMemo(
+    () =>
+      new Set(
+        world.people
+          .filter(
+            (person) =>
+              !person.direct_walk &&
+              !person.route &&
+              !person.in_vehicle_id &&
+              !person.on_train &&
+              !person.activity?.startsWith("Sleeping"),
+          )
+          .map((person) => person.target_place_id),
+      ),
+    [world.people],
+  );
+  const projectsById = useMemo(
+    () => new Map(world.construction_projects?.map((project) => [project.id, project])),
+    [world.construction_projects],
+  );
+  const cameraLeft = (mapSize.width - cameraWidth) / 2 + panX;
+  const cameraTop = (mapSize.height - cameraHeight) / 2 + panY;
   const selected = world.people.find((person) => person.id === selectedId);
   const trainPassengers = world.people.filter((person) => person.on_train);
   const riverX = mapSize.width - 40;
@@ -115,7 +178,7 @@ export function TownMap({ world, selectedId, onSelect, zoom = 1, position, onPos
   return (
     <svg
       aria-label="SmallFolks town map"
-      className={`town-map ${world.simulation.running ? "" : "is-paused"}`}
+      className={`town-map ${world.simulation.running && pageVisible ? "" : "is-paused"} ${scale < 0.65 ? "is-overview" : ""} ${world.people.length > 150 ? "is-dense" : ""}`}
       ref={svgRef}
       viewBox={`${(mapSize.width - cameraWidth) / 2 + panX} ${(mapSize.height - cameraHeight) / 2 + panY} ${cameraWidth} ${cameraHeight}`}
       onPointerDown={(event) => {
@@ -180,14 +243,35 @@ export function TownMap({ world, selectedId, onSelect, zoom = 1, position, onPos
           <path d="M2 0v12" stroke="#b7a36c" strokeWidth="1.5" opacity=".5" />
         </pattern>
       </defs>
-      <rect className="map-ground" x={-mapSize.width} y={-grassMargin} height={framedSize.height} width={mapSize.width * 3} />
-      <rect x={-mapSize.width} y={-grassMargin} width={mapSize.width * 3} height={framedSize.height} fill="url(#grass-ink)" pointerEvents="none" />
+      <rect
+        className="map-ground"
+        x={-mapSize.width}
+        y={-grassMargin}
+        height={framedSize.height}
+        width={mapSize.width * 3}
+      />
+      <rect
+        x={-mapSize.width}
+        y={-grassMargin}
+        width={mapSize.width * 3}
+        height={framedSize.height}
+        fill="url(#grass-ink)"
+        pointerEvents="none"
+      />
       <g className="river-water" aria-hidden="true" pointerEvents="none">
         <path className="river-bank" d={riverPath} />
         <path className="river" d={riverPath} />
-        <path className="river-ripples river-current-left" d={riverPath} transform="translate(-10 0)" />
+        <path
+          className="river-ripples river-current-left"
+          d={riverPath}
+          transform="translate(-10 0)"
+        />
         <path className="river-ripples" d={riverPath} />
-        <path className="river-ripples river-current-right" d={riverPath} transform="translate(10 0)" />
+        <path
+          className="river-ripples river-current-right"
+          d={riverPath}
+          transform="translate(10 0)"
+        />
       </g>
       <g className="sun-doodle" transform="translate(1170 64)" aria-hidden="true">
         <circle r="17" />
@@ -203,10 +287,12 @@ export function TownMap({ world, selectedId, onSelect, zoom = 1, position, onPos
             className={road.id.startsWith("road:access-") ? "road road-access" : "road"}
             points={road.points.map((point) => point.join(",")).join(" ")}
           />
-          {!road.id.startsWith("road:access-") && <polyline
-            className="road-marking"
-            points={road.points.map((point) => point.join(",")).join(" ")}
-          />}
+          {!road.id.startsWith("road:access-") && (
+            <polyline
+              className="road-marking"
+              points={road.points.map((point) => point.join(",")).join(" ")}
+            />
+          )}
         </g>
       ))}
       <g className="sidewalks">
@@ -242,12 +328,12 @@ export function TownMap({ world, selectedId, onSelect, zoom = 1, position, onPos
           onSelect={onSelect}
           place={place}
           selected={place.id === selectedId}
-          smokeActive={place.kind === "home"
-            ? world.people.some((person) => person.target_place_id === place.id
-              && !person.direct_walk && !person.route && !person.in_vehicle_id && !person.on_train
-              && !person.activity?.startsWith("Sleeping"))
-            : place.operating_state?.is_open === true}
-          project={world.construction_projects?.find((project) => project.id === place.construction_project_id)}
+          smokeActive={
+            place.kind === "home"
+              ? activeHomes.has(place.id)
+              : place.operating_state?.is_open === true
+          }
+          project={projectsById.get(place.construction_project_id ?? "")}
         />
       ))}
       <TownTrees plantedTrees={world.planted_trees} />
@@ -269,17 +355,32 @@ export function TownMap({ world, selectedId, onSelect, zoom = 1, position, onPos
           const index = seen.get(key) ?? 0;
           seen.set(key, index + 1);
           const count = counts.get(key) ?? 1;
+          const offsetX = (index - (count - 1) / 2) * 26;
+          const offsetY = index % 2 ? 5 : -5;
+          // Keep an overscan margin for props, badges and movement at the viewport edge.
+          const x = entity.position.x + offsetX;
+          const y = entity.position.y + offsetY;
+          if (
+            x < cameraLeft - 100 ||
+            x > cameraLeft + cameraWidth + 100 ||
+            y < cameraTop - 100 ||
+            y > cameraTop + cameraHeight + 100
+          )
+            return null;
           return (
             <EntitySprite
               entity={entity}
-              driver={entity.kind === "vehicle" ? world.people.find((person) => person.id === entity.driver_id) : undefined}
+              driver={
+                entity.kind === "vehicle" ? peopleById.get(entity.driver_id ?? "") : undefined
+              }
               driverSelected={entity.kind === "vehicle" && entity.driver_id === selectedId}
               key={entity.id}
               onSelect={onSelect}
               selected={entity.id === selectedId}
               seed={world.seed}
               badgeLift={index * 20}
-              visualOffset={{ x: (index - (count - 1) / 2) * 26, y: index % 2 ? 5 : -5 }}
+              offsetX={offsetX}
+              offsetY={offsetY}
             />
           );
         });
@@ -885,14 +986,15 @@ function BuildingFeature({ placeId }: { placeId: string }) {
   }
 }
 
-function EntitySprite({
+const EntitySprite = memo(function EntitySprite({
   entity,
   driver,
   driverSelected,
   onSelect,
   selected,
   seed,
-  visualOffset,
+  offsetX,
+  offsetY,
   badgeLift,
 }: {
   entity: Entity;
@@ -901,18 +1003,22 @@ function EntitySprite({
   onSelect: Props["onSelect"];
   selected: boolean;
   seed: number;
-  visualOffset: { x: number; y: number };
+  offsetX: number;
+  offsetY: number;
   badgeLift: number;
 }) {
   const activity = activityKind(entity.activity, entity.role);
   const appearance = entity.kind === "person" ? appearanceFor(entity.id, seed) : null;
   const working = activity === "work";
   const workStyle = working ? workStyleFor(entity.role) : undefined;
-  const x = entity.position.x + visualOffset.x;
-  const y = entity.position.y + visualOffset.y;
-  const vehiclePaint = entity.model === "sports"
-    ? (["ruby", "sapphire", "emerald", "amethyst", "champagne"].includes(entity.palette ?? "") ? entity.palette : "ruby")
-    : entity.palette ?? "coral";
+  const x = entity.position.x + offsetX;
+  const y = entity.position.y + offsetY;
+  const vehiclePaint =
+    entity.model === "sports"
+      ? ["ruby", "sapphire", "emerald", "amethyst", "champagne"].includes(entity.palette ?? "")
+        ? entity.palette
+        : "ruby"
+      : (entity.palette ?? "coral");
   const className = `map-entity ${entity.kind} palette-${vehiclePaint} activity-${activity} ${selected || driverSelected ? "is-selected" : ""}`;
   const visualStyle = {
     transform: `translate(${x}px, ${y}px)`,
@@ -939,7 +1045,9 @@ function EntitySprite({
       transform={`translate(${x} ${y})`}
     >
       {entity.kind !== "vehicle" && <circle className="entity-hit" r="25" />}
-      {entity.kind !== "vehicle" && (selected || driverSelected) && <ellipse className="selection-ring" cy="13" rx="19" ry="9" />}
+      {entity.kind !== "vehicle" && (selected || driverSelected) && (
+        <ellipse className="selection-ring" cy="13" rx="19" ry="9" />
+      )}
       {entity.kind !== "vehicle" && <ellipse className="entity-shadow" cy="14" rx="9" ry="3" />}
       {entity.kind === "person" && appearance ? (
         <>
@@ -954,7 +1062,13 @@ function EntitySprite({
       ) : entity.kind === "pet" ? (
         <PetSprite activity={activity} />
       ) : (
-        <VehicleSprite sports={entity.model === "sports"} driver={driver} heading={entity.heading ?? 0} highlighted={selected || driverSelected} onSelect={onSelect} />
+        <VehicleSprite
+          sports={entity.model === "sports"}
+          driver={driver}
+          heading={entity.heading ?? 0}
+          highlighted={selected || driverSelected}
+          onSelect={onSelect}
+        />
       )}
       {(selected || driverSelected) && (
         <text className="entity-label" y={entity.kind === "vehicle" ? -25 : -63 - badgeLift}>
@@ -963,7 +1077,7 @@ function EntitySprite({
       )}
     </g>
   );
-}
+});
 
 function ActivityBadge({
   kind,
@@ -1337,7 +1451,7 @@ function VehicleSprite({ sports, driver, heading, highlighted, onSelect }: { spo
     </g>
   );
 }
-function TownTrees({ plantedTrees = [] }: { plantedTrees?: { position: { x: number; y: number } }[] }) {
+function TownTreesContent({ plantedTrees = [] }: { plantedTrees?: { position: { x: number; y: number } }[] }) {
   return (
     <g className="trees">
       {[
@@ -1368,7 +1482,7 @@ function TownTrees({ plantedTrees = [] }: { plantedTrees?: { position: { x: numb
   );
 }
 
-function TownDetails() {
+function TownDetailsContent() {
   return (
     <g className="town-details" aria-hidden="true" pointerEvents="none">
       {[
@@ -1408,3 +1522,6 @@ function TownDetails() {
     </g>
   );
 }
+const TownTrees = memo(TownTreesContent);
+
+const TownDetails = memo(TownDetailsContent);

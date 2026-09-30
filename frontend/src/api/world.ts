@@ -3,6 +3,12 @@
 const API_PREFIX =
   import.meta.env.VITE_API_PREFIX || (import.meta.env.DEV ? "http://127.0.0.1:5340/api" : "/api");
 
+export function worldStreamUrl(worldId: string) {
+  const url = new URL(`${API_PREFIX}/worlds/${encodeURIComponent(worldId)}/stream`, window.location.href);
+  url.protocol = url.protocol === "https:" ? "wss:" : "ws:";
+  return url.href;
+}
+
 export type Position = { x: number; y: number };
 export type BuildingOperatingState = {
   is_open: boolean;

@@ -1,10 +1,13 @@
+import asyncio
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException
+import anyio
+from fastapi import APIRouter, Depends, HTTPException, WebSocket, WebSocketDisconnect
 from pydantic import BaseModel, Field
 from sqlmodel import Session
 
 from db import get_session
+from services.world_stream import world_patch, world_streams
 from services.worlds import (
     WorldRevisionConflictError,
     advance_world,
@@ -16,10 +19,63 @@ from services.worlds import (
     set_business_price,
     set_household_contribution,
     set_world_running,
+    subscribe_world,
     take_over_world_business,
 )
 
 router = APIRouter(prefix="/worlds")
+
+
+@router.websocket("/{world_id}/stream")
+async def stream_world(websocket: WebSocket, world_id: str) -> None:
+    loop = asyncio.get_running_loop()
+
+    try:
+        state, subscription = await anyio.to_thread.run_sync(subscribe_world, world_id, loop)
+    except HTTPException:
+        await websocket.close(code=1008)
+        return
+
+    async def send_updates():
+        previous = state
+        await asyncio.wait_for(websocket.send_json({"type": "snapshot", "world": state}), 10)
+        while True:
+            current = await subscription.queue.get()
+            if current["revision"] <= previous["revision"]:
+                continue
+            operations = await asyncio.to_thread(world_patch, previous, current)
+            if operations:
+                await asyncio.wait_for(websocket.send_json({
+                    "type": "patch", "base_revision": previous["revision"],
+                    "revision": current["revision"], "operations": operations,
+                }), 10)
+            previous = current
+
+    async def receive_disconnect():
+        while True:
+            await websocket.receive_text()
+
+    tasks = []
+    try:
+        await websocket.accept()
+        tasks = [asyncio.create_task(send_updates()), asyncio.create_task(receive_disconnect())]
+        done, _ = await asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED)
+        for task in done:
+            task.result()
+    except (WebSocketDisconnect, TimeoutError, OSError):
+        pass
+    except asyncio.CancelledError:
+        pass
+    finally:
+        world_streams.unsubscribe(world_id, subscription)
+        for task in tasks:
+            task.cancel()
+        with anyio.CancelScope(shield=True):
+            await asyncio.gather(*tasks, return_exceptions=True)
+            try:
+                await websocket.close()
+            except (WebSocketDisconnect, RuntimeError, OSError):
+                pass
 
 
 class CreateWorldInput(BaseModel):

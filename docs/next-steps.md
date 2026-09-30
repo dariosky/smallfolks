@@ -336,3 +336,65 @@ The bank sidebar shows every saved loan, newest first, including completed loans
 ### Personal sleep routines (2026-09-30)
 
 Residents now keep stable individual wake preferences, 7.5–9-hour sleep targets, and different preparation times. Workday waking allows the actual walking commute before the shift; late-shift staff can go to bed after midnight and wake later. Days off add 45–120 minutes to preferred waking, with no routine wake before 08:00. The previous universal 22:00–06:00 sleep block is removed. Saved towns gain preferences additively, sleeping residents show their planned wake time, and urgent pet care or journeys already underway retain priority. Need-driven naps remain available.
+
+## Browser performance — 2026-09-30
+
+Implemented snapshot structural sharing, memoized sprites/scenery, indexed home
+occupancy and drivers, and off-camera resident/pet/car culling with a 100-unit
+overscan margin. Polling is serialized and stops in hidden tabs; it refreshes on
+return. Hidden animations pause. At overview scale (under 0.65 screen pixels per
+map unit), small ambient and unselected stationary resident animations pause; walking
+gait remains animated at every zoom level. The same rule applies
+to cities with more than 150 residents at close zoom. Movement
+transitions and selected resident animations remain active.
+
+Polling lifecycle tests and a 500-resident culling case cover these changes.
+Playwright/Chromium measurements against the Vite development frontend:
+
+| Scenario (5-second samples) | Frames/second | Main-thread busy time |
+| --- | ---: | ---: |
+| Synthetic 100 residents, overview | 113 | 39% |
+| Synthetic 500 residents, overview | 37 | 62% |
+| Synthetic 500 residents, 300% zoom, before dense animation rule | 29 | 99% |
+| Same close view, after dense animation rule | 66 | 69% |
+| Saved 17-resident snapshot, unchanged responses | not sampled | 21% |
+
+The saved snapshot rendered without page errors, selection opened correctly,
+hiding the page stopped polls and paused animation, and visibility resumed
+polling. Synthetic residents mixed walking, reading and sleeping; walking
+positions changed on polls. All API responses were intercepted, so these results
+exclude backend simulation/network cost. Main-thread busy time is the CDP
+TaskDuration delta divided by wall time, not Chrome Helper's OS CPU percentage.
+These short development-mode samples vary and are not production guarantees.
+Actual production traces of running 100/500-resident saved cities are still needed. Full snapshots,
+visible SVG detail, all buildings, and mansion gate traffic observations still
+scale with city size; use traces to prioritize further work.
+
+### Commit-driven WebSocket updates — 2026-09-30
+
+Replaced browser snapshot polling with `/api/worlds/{world_id}/stream`.
+Connections receive a `snapshot` containing the world, followed by `patch`
+messages with `base_revision`, `revision` and sparse operations (`path` with
+string keys/numeric array indexes, plus `value` or `deleted: true`). Stable
+collections patch only changed fields; added/removed/reordered arrays are
+replaced. Every successful save publishes after committing, including live
+ticks and commands. Unchanged/paused worlds send no application messages.
+
+Each subscriber retains only the newest pending state. Patches are computed
+from the last delivered state, so skipping intermediate revisions is valid.
+The browser copies touched containers once and preserves untouched references.
+Hidden pages disconnect; visibility and reconnects receive a fresh snapshot.
+Revision mismatches trigger reconnect/resync. Reconnects back off from 1 to 10
+seconds. HTTP command responses remain available and stale responses cannot
+replace newer displayed revisions. There is no recurring HTTP polling fallback.
+
+Playwright against a running backend using a temporary database copy measured a
+104,140-byte snapshot and 19 patches over 5 seconds, averaging 7,398 bytes each
+(28,112 bytes/second). Pausing produced zero application frames over 2.5 seconds.
+Selection, visibility reconnect/resnapshot and error-free rendering were checked.
+These are uncompressed WebSocket application payloads in development, excluding
+initial connection cost, framing and keepalives; they are not OS CPU measurements.
+
+The in-memory publisher follows the existing single-process simulation model.
+Multiple server workers would need shared pub/sub and one simulation owner.
+Production proxies must forward WebSocket upgrade requests for this endpoint.

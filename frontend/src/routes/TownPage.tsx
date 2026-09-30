@@ -1,6 +1,8 @@
+import { replaceEqualDeep } from "@tanstack/react-query";
+import { useWorldStream } from "../hooks/useWorldStream";
 import { TownHallWork } from "../world/TownHallWork";
 import { BuildingStatus } from "../world/BuildingStatus";
-import { useEffect, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useState, type FormEvent } from "react";
 import {
   advanceWorld,
   createWorld,
@@ -49,7 +51,15 @@ function scheduledTime(clock: string, scheduledAt: string) {
 const PRICE_PERCENTS = [70, 80, 90, 100, 110, 120, 130];
 
 export function TownPage() {
-  const [world, setWorld] = useState<World | null>(null);
+  const [world, updateWorld] = useState<World | null>(null);
+  const setWorld = useCallback((next: World) => {
+    updateWorld((previous) =>
+      previous?.id === next.id && previous.revision > next.revision
+        ? previous
+        : replaceEqualDeep(previous, next),
+    );
+    setError("");
+  }, []);
   const [selected, setSelected] = useState<Selection | null>(null);
   const [worldId, setWorldId] = useState<string | null>(null);
   const [error, setError] = useState("");
@@ -75,15 +85,10 @@ export function TownPage() {
         setError(`Cannot reach the town backend at http://127.0.0.1:5340. ${detail}`);
       });
   }, []);
-  useEffect(() => {
-    if (!worldId) return undefined;
-    const timer = window.setInterval(() => {
-      void getWorld(worldId)
-        .then(setWorld)
-        .catch(() => setError("Lost connection to the town backend."));
-    }, 250);
-    return () => window.clearInterval(timer);
-  }, [worldId]);
+  const reportStreamError = useCallback(() => {
+    setError("Lost connection to the town backend.");
+  }, []);
+  useWorldStream(worldId, setWorld, reportStreamError);
 
   async function advance(minutes: number) {
     if (!world) return;

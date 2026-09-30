@@ -325,3 +325,25 @@ it("keeps completed loans visible in the bank history alongside outstanding loan
   expect(markup).toContain("car loan:</strong> repaid");
   expect(markup).toContain("car loan:</strong> active");
 });
+
+it("culls off-camera sprites in a 500-resident city without losing the population count", () => {
+  const people = Array.from({ length: 500 }, (_, index) => ({
+    ...world.people[0],
+    id: `person:${index}`,
+    name: `Resident ${index}`,
+    position: { x: 560 + index % 10 * 8, y: index < 20 ? 200 + index : 2200 },
+  }));
+  const markup = renderToStaticMarkup(
+    <TownMap
+      world={{ ...world, people, map_size: { width: 1200, height: 3000 } }}
+      zoom={4}
+      position={{ x: 0, y: -1140 }}
+      selectedId={null}
+      onSelect={() => {}}
+    />,
+  );
+  expect((markup.match(/class="map-entity /g) ?? []).length).toBe(20);
+  expect(markup).toContain("500 neighbours");
+  expect(markup).toContain("is-dense");
+  expect(markup).not.toContain("Resident 499,");
+});

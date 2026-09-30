@@ -1,3 +1,4 @@
+import asyncio
 import json
 from collections import defaultdict
 from datetime import UTC, datetime
@@ -9,6 +10,7 @@ from sqlmodel import Session, select
 from db import engine
 from generation.fixture_town import clone_fixture
 from persistence.models import WorldSnapshot
+from services.world_stream import world_streams
 from simulation.buildings import update_building_status
 from simulation.economy import PRICE_PERCENT_OPTIONS, price_cents, take_over_business
 from simulation.tick import LOGICAL_TICK_SECONDS, advance, advance_seconds
@@ -82,6 +84,13 @@ def load_world(session: Session, world_id: str) -> dict:
         ) from error
 
 
+def subscribe_world(world_id: str, loop: asyncio.AbstractEventLoop):
+    # Read and subscribe under the mutation lock so a commit cannot fall between them.
+    with _world_locks[world_id], Session(engine) as session:
+        state = load_world(session, world_id)
+        return state, world_streams.subscribe(world_id, loop)
+
+
 def save_world(session: Session, state: dict) -> None:
     snapshot = session.get(WorldSnapshot, state["id"])
     if snapshot is None:  # pragma: no cover - protected by load_world
@@ -91,6 +100,7 @@ def save_world(session: Session, state: dict) -> None:
     snapshot.updated_at = datetime.now(UTC)
     session.add(snapshot)
     session.commit()
+    world_streams.publish(state)
 
 
 def advance_world(
