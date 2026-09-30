@@ -24,15 +24,32 @@ function activate(event: KeyboardEvent<SVGGElement>, action: () => void) {
 }
 
 export function TownMap({ world, selectedId, onSelect }: Props) {
+  const mapSize = world.map_size ?? {
+    width: 1200,
+    height: Math.max(720, ...(world.trains?.flatMap((train) => train.track?.map((point) => point.y + 80) ?? []) ?? [])),
+  };
   const selected = world.people.find((person) => person.id === selectedId);
   const trainPassengers = world.people.filter((person) => person.on_train);
+  const riverX = mapSize.width - 40;
+  const riverPath = `M${riverX} -40 ${Array.from(
+    { length: Math.ceil((mapSize.height + 80) / 320) },
+    (_, index) => {
+      const bend = index % 2 === 0 ? -1 : 1;
+      return `c${bend * 44} 105 ${bend * 44} 215 0 320`;
+    },
+  ).join(" ")}`;
   return (
     <svg
       aria-label="SmallFolks town map"
       className={`town-map ${world.simulation.running ? "" : "is-paused"}`}
-      viewBox="0 0 1200 720"
+      viewBox={`0 0 ${mapSize.width} ${mapSize.height}`}
     >
       <defs>
+        <linearGradient id="river-water" x1="0" y1="0" x2="1" y2="0">
+          <stop offset="0%" stopColor="#65aebc" />
+          <stop offset="45%" stopColor="#8ad4de" />
+          <stop offset="100%" stopColor="#50a3b6" />
+        </linearGradient>
         <pattern id="grass-ink" width="46" height="38" patternUnits="userSpaceOnUse">
           <path
             d="m8 12 2-4 2 4m22 18 2-4 2 3"
@@ -54,10 +71,15 @@ export function TownMap({ world, selectedId, onSelect }: Props) {
           <path d="M2 0v12" stroke="#b7a36c" strokeWidth="1.5" opacity=".5" />
         </pattern>
       </defs>
-      <rect className="map-ground" height="720" width="1200" />
-      <rect width="1200" height="720" fill="url(#grass-ink)" pointerEvents="none" />
-      <path className="river" d="M1160 -20c-55 145 36 245-17 390s24 225-35 370" />
-      <path className="river-ripples" d="M1160 -20c-55 145 36 245-17 390s24 225-35 370" />
+      <rect className="map-ground" height={mapSize.height} width={mapSize.width} />
+      <rect width={mapSize.width} height={mapSize.height} fill="url(#grass-ink)" pointerEvents="none" />
+      <g className="river-water" aria-hidden="true" pointerEvents="none">
+        <path className="river-bank" d={riverPath} />
+        <path className="river" d={riverPath} />
+        <path className="river-ripples river-current-left" d={riverPath} transform="translate(-10 0)" />
+        <path className="river-ripples" d={riverPath} />
+        <path className="river-ripples river-current-right" d={riverPath} transform="translate(10 0)" />
+      </g>
       <g className="sun-doodle" transform="translate(1170 64)" aria-hidden="true">
         <circle r="17" />
         <path d="M0-29v6m0 46v6M-29 0h6m46 0h6M-20-20l4 4m32 32 4 4M20-20l-4 4m-32 32-4 4" />

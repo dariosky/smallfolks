@@ -6,7 +6,7 @@ from simulation.housing import ensure_home_parking
 from simulation.tick import STATIONS, rail_track
 from simulation.versions import WORLD_FORMAT_VERSION
 
-GENERATION_VERSION = "poc-9"
+GENERATION_VERSION = "city-10"
 SIMULATION_VERSION = "poc-4"
 
 PEOPLE = [
@@ -90,6 +90,29 @@ PEOPLE = [
     ("person:clara", "Clara Weiss", "place:rowan-9", "place:cinema", "Usher", "usher"),
 ]
 
+# A mix of shared family houses, couples, and residents living alone.
+NEW_RESIDENTS = [
+    ("alice", "Alice Romano", 11, "school", "Teacher", "teacher"),
+    ("oliver", "Oliver Hart", 11, "school", "Teacher", "teacher"),
+    ("emma", "Emma Romano", 11, "library", "Library assistant", "student"),
+    ("leo", "Leo Hart", 11, "workshop", "Apprentice", "mechanic"),
+    ("isabel", "Isabel Vega", 12, "clinic", "Nurse", "nurse"),
+    ("mateo", "Mateo Vega", 12, "post-office", "Postal clerk", "host"),
+    ("eva", "Eva Vega", 12, "townhall", "Planner", "planner"),
+    ("felix", "Felix Vega", 12, "school", "Teacher", "teacher"),
+    ("maya", "Maya Chen", 13, "townhall", "Planner", "planner"),
+    ("noah", "Noah Chen", 13, "post-office", "Postal clerk", "host"),
+    ("ada", "Ada Chen", 13, "library", "Librarian", "librarian"),
+    ("sara", "Sara Lind", 14, "townhall", "Planner", "planner"),
+    ("oscar", "Oscar Lind", 14, "clinic", "Nurse", "nurse"),
+    ("julia", "Julia Marin", 15, "post-office", "Postal clerk", "host"),
+    ("sam", "Sam Wilson", 16, "workshop", "Carpenter", "carpenter"),
+]
+PEOPLE.extend(
+    (f"person:{slug}", name, f"place:rowan-{home}", f"place:{work}", role, visual)
+    for slug, name, home, work, role, visual in NEW_RESIDENTS
+)
+
 SHIFT_WINDOWS = {
     "person:diego": (8 * 60, 20 * 60),
     "person:marta": (16 * 60, 23 * 60),
@@ -153,12 +176,17 @@ PLACES = [
     ("place:lantern-bar", "The Lantern Bar", "bar", 875, 550),
     ("place:workshop", "Eastgate Workshop", "workplace", 1020, 150),
     ("place:library", "Willow Library", "workplace", 535, 590),
-    ("place:school", "SmallFolks School", "workplace", 1010, 370),
+    ("place:school", "SmallFolks School", "workplace", 1010, 435),
     ("place:clinic", "Oak Clinic", "workplace", 1010, 550),
     ("place:townhall", "Town Hall", "workplace", 750, 570),
     ("place:park", "Mossy Common", "park", 540, 285),
     ("place:plaza", "Lantern Plaza", "park", 690, 285),
 ]
+
+PLACES.extend(
+    (f"place:rowan-{number}", f"Willow House {number - 10}", "home", x, 850)
+    for number, x in zip(range(11, 17), [120, 290, 460, 630, 800, 970], strict=True)
+)
 
 HOUSEHOLDS = [
     ("household:rowan-1", "place:rowan-1", ["person:elena", "person:marco"], 8),
@@ -171,6 +199,12 @@ HOUSEHOLDS = [
     ("household:rowan-8", "place:rowan-8", ["person:paolo"], 3),
     ("household:rowan-9", "place:rowan-9", ["person:clara"], 3),
 ]
+HOUSEHOLDS.extend(
+    (f"household:rowan-{number}", f"place:rowan-{number}",
+     [f"person:{slug}" for slug, _, home, *_ in NEW_RESIDENTS if home == number], 12)
+    for number in range(11, 17)
+)
+
 HOUSEHOLD_BY_MEMBER = {
     member_id: household_id
     for household_id, _, member_ids, _ in HOUSEHOLDS
@@ -194,13 +228,13 @@ def build_fixture(seed: int) -> dict:
                 "visual": visual,
                 "palette": ["coral", "blue", "ochre", "plum", "green"][index % 5],
                 "needs": {
-                    "hunger": 28 + index * 3,
+                    "hunger": 28 + (index % 15) * 3,
                     "rest": 22,
-                    "social": 35 + index,
-                    "boredom": BOREDOM_START[index],
+                    "social": 35 + index % 15,
+                    "boredom": BOREDOM_START[index % len(BOREDOM_START)],
                 },
-                "social_inclination": SOCIAL_INCLINATIONS[index],
-                "cinema_inclination": CINEMA_INCLINATIONS[index],
+                "social_inclination": SOCIAL_INCLINATIONS[index % len(SOCIAL_INCLINATIONS)],
+                "cinema_inclination": CINEMA_INCLINATIONS[index % len(CINEMA_INCLINATIONS)],
                 "shift_start_minute": SHIFT_WINDOWS.get(person_id, (8 * 60, 17 * 60))[0],
                 "shift_end_minute": SHIFT_WINDOWS.get(person_id, (8 * 60, 17 * 60))[1],
                 "position": {
@@ -227,9 +261,12 @@ def build_fixture(seed: int) -> dict:
         }
         for household_id, home_id, member_ids, food_servings in HOUSEHOLDS
     ]
+    for household in households:
+        if len(household["member_ids"]) >= 3:
+            next(place for place in places if place["id"] == household["home_place_id"])["house_style"] = "large"
     validate_place_layout(places)
     world = {
-        "id": f"world:poc-9-{seed}",
+        "id": f"world:city-10-{seed}",
         "seed": seed,
         "world_format_version": WORLD_FORMAT_VERSION,
         "revision": 0,
@@ -247,14 +284,13 @@ def build_fixture(seed: int) -> dict:
         "roads": [
             {"id": "road:grand-avenue", "points": [[45, 350], [1140, 350]]},
             {"id": "road:west-avenue", "points": [[365, 55], [365, 670]]},
-            {"id": "road:centre-avenue", "points": [[700, 55], [700, 670]]},
-            {"id": "road:east-avenue", "points": [[850, 55], [850, 670]]},
+            {"id": "road:east-avenue", "points": [[850, 55], [850, 350], [1140, 350], [1140, 670]]},
             {"id": "road:rowan-north", "points": [[45, 170], [365, 170]]},
             {"id": "road:rowan-middle", "points": [[45, 330], [365, 330]]},
             {"id": "road:rowan-south", "points": [[45, 520], [365, 520]]},
             {"id": "road:market-street", "points": [[365, 235], [850, 235]]},
-            {"id": "road:orchard-street", "points": [[365, 520], [850, 520]]},
-            {"id": "road:eastgate-lane", "points": [[850, 520], [1140, 520]]},
+            {"id": "road:orchard-street", "points": [[365, 520], [800, 520]]},
+            {"id": "road:eastgate-lane", "points": [[800, 520], [800, 485], [1140, 485]]},
         ],
         "paths": [
             {"id": "path:rowan", "points": [[45, 145], [365, 145], [365, 520]]},
@@ -320,6 +356,23 @@ def build_fixture(seed: int) -> dict:
             {"at": "07:30", "summary": "Bruno is due to walk Pippin in Mossy Common."},
         ],
     }
+    world["map_size"] = {"width": 1200, "height": 1000}
+    world["roads"].extend([
+        {"id": "road:south-avenue", "points": [[45, 670], [1140, 670]]},
+        {"id": "road:willow-link", "points": [[365, 670], [365, 920]]},
+        {"id": "road:willow-street", "points": [[60, 920], [1080, 920]]},
+        {"id": "road:east-link", "points": [[850, 670], [850, 920]]},
+    ])
+    # Connect each front entrance to a street, including civic buildings and parks.
+    from simulation.routing import nearest_road_point
+
+    streets = list(world["roads"])
+    for place in places:
+        entrance = {"x": place["position"]["x"], "y": place["position"]["y"] + 48}
+        street = nearest_road_point(streets, entrance)
+        points = [[street["x"], street["y"]], [entrance["x"], entrance["y"]]]
+        if points[0] != points[1]:
+            world["roads"].append({"id": f"road:access-{place['id']}", "points": points})
     ensure_home_parking(world)
     ensure_economy(world)
     return world

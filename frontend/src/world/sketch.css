@@ -60,17 +60,41 @@
   stroke-width: 2;
   stroke-dasharray: none;
 }
+.town-map .river-bank {
+  fill: none;
+  stroke: #91aa78;
+  stroke-width: 47;
+  stroke-linecap: round;
+}
 .town-map .river {
-  stroke: #71bcca;
+  fill: none;
+  stroke: url(#river-water);
   stroke-width: 39;
+  stroke-linecap: round;
   opacity: 1;
 }
 .town-map .river-ripples {
   fill: none;
-  stroke: #c7f6e9;
-  stroke-width: 2;
-  stroke-dasharray: 24 30;
-  animation: water-flow 5s linear infinite;
+  stroke: #defaf5;
+  stroke-width: 2.2;
+  stroke-linecap: round;
+  stroke-dasharray: 22 32;
+  opacity: .7;
+  animation: water-flow 4s linear infinite;
+}
+.town-map .river-current-left {
+  stroke-width: 1.3;
+  stroke-dasharray: 12 42;
+  opacity: .5;
+  animation-duration: 6s;
+  animation-delay: -2s;
+}
+.town-map .river-current-right {
+  stroke-width: 1.6;
+  stroke-dasharray: 4 50;
+  opacity: .6;
+  animation-duration: 5s;
+  animation-delay: -3s;
 }
 .town-map .road {
   stroke: #e8c994;

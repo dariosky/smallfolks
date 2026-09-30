@@ -4,7 +4,7 @@
 
 ![The SmallFolks town and Elena Rossi's activity inspector](docs/images/smallfolks-town.png)
 
-The current prototype is a fixed town with fifteen residents, households, a dog, local businesses and a railway. You can pause the simulation or advance its clock by 15 minutes or an hour. The world is saved by the Python backend; the React frontend draws the town and its live activity. Procedural town generation and a broader economy are future work.
+The current prototype is a fixed town with thirty residents, single residents and larger shared households, a dog, local businesses and a railway. You can pause the simulation or advance its clock by 15 minutes or an hour. The world is saved by the Python backend; the React frontend draws the town and its live activity. Procedural town generation and a broader economy are future work.
 
 ## Run locally
 

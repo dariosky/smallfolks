@@ -50,6 +50,7 @@ export type RenderEntity = {
   palette: string;
 };
 export type World = {
+  map_size?: { width: number; height: number };
   id: string;
   seed: number;
   clock: string;

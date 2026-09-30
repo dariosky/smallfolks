@@ -67,7 +67,7 @@ def test_fixture_world_can_advance_and_reload():
         assert reloaded.json()["clock"] == expected_clock
         assert reloaded.json()["world_format_version"] == WORLD_FORMAT_VERSION
         assert reloaded.json()["revision"] == 1
-        assert len(reloaded.json()["people"]) == 15
+        assert len(reloaded.json()["people"]) == 30
         index = client.get("/api/worlds")
         assert index.status_code == 200
         assert any(item["id"] == world_id for item in index.json())
@@ -157,7 +157,7 @@ def test_render_state_and_inspector_are_available():
         world = client.post("/api/worlds", json={"seed": 222}).json()
         render = client.get(f"/api/worlds/{world['id']}/render-state")
         inspector = client.get(f"/api/worlds/{world['id']}/entities/person:elena")
-        assert len(render.json()["entities"]) == 18
+        assert len(render.json()["entities"]) == 33
         assert inspector.json()["name"] == "Elena Rossi"
 
 
@@ -309,7 +309,7 @@ def test_ten_person_platform_fills_eight_seats_then_recovers_on_next_service():
 
     advance(restored, 35)
     assert len(restored_queue["entries"]) == 0
-    assert sum(bool(person.get("on_train")) for person in restored["people"]) == 2
+    assert sum(bool(person.get("on_train")) for person in restored["people"] if person["id"] in {item["id"] for item in crowd}) == 2
 
 
 def test_a_missed_train_causes_a_faster_walk_from_the_actual_platform():
@@ -456,7 +456,8 @@ def test_distant_commuters_walk_to_owned_cars_drive_roads_and_park_before_work()
     assert lea["in_vehicle_id"] == car["id"]
     assert lea["position"] == car["position"]
     assert lea["journey"]["legs"][0]["edge_ids"] == [
-        "road:rowan-north", "road:west-avenue", "road:orchard-street"
+        "road:rowan-north", "road:west-avenue", "road:south-avenue",
+        "road:access-place:library"
     ]
     route = lea["car_trip"]["road_route"]
     assert all(
@@ -602,6 +603,7 @@ def test_gardener_works_away_from_home_and_wages_are_shared():
 
 def test_old_gardener_assignment_and_missing_accounts_upgrade_in_memory():
     saved = build_fixture(453)
+    saved["generation_version"] = "poc-9"
     bruno = next(person for person in saved["people"] if person["id"] == "person:bruno")
     bruno["workplace_id"] = bruno["home_place_id"]
     bruno["activity"] = "Working as gardener"

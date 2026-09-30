@@ -278,3 +278,9 @@ Run relevant backend checks and frontend type/lint/build for each affected slice
 2. Unify the remaining train and pedestrian legs into one journey executor, including route continuity for corners, pause and delayed observations.
 3. Convert the step 4 prototype slices into typed commitments/activities with explicit duration, opening hours and effects. Preserve household food and dog-care behaviour while making it reproducible and inspectable.
 4. Run the first browser acceptance pass from step 5: pause/resume, a full train trip, social/cinema outing, dog walk, large manual advance and two-tab observation. Record any remaining visual discontinuity before expanding generation or economy.
+
+### Larger city layout (2026-09-30)
+
+- New `city-10` worlds contain 30 residents across 15 occupied households, with single residents, couples, and three- and four-person shared homes. Larger households use the existing larger house artwork.
+- The map extends to 1200 by 1000, with a southern residential neighborhood and street access to every building entrance. School placement avoids Grand Avenue.
+- Folk Loop now follows a winding closed route through the center and western residential district. Track rendering, station distances, train positions and coach positions share that geometry. Existing world IDs remain saved separately.

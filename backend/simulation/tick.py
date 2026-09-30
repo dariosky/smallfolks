@@ -1,5 +1,5 @@
 from datetime import datetime, timedelta
-from math import atan2, ceil, cos, degrees, hypot, radians, sin
+from math import atan2, ceil, degrees, hypot
 
 from simulation.economy import (
     BUSINESS_HOURS,
@@ -28,8 +28,16 @@ DRIVING_SPEED = 90
 TRAIN_SPEED = 120
 RAIL_TOP = 640
 RAIL_SIDE = 542
-RAIL_CURVE = 47.1239
-RAIL_LENGTH = RAIL_TOP * 2 + RAIL_SIDE * 2 + RAIL_CURVE * 4
+RAIL_CURVE = hypot(30, 30)
+RAIL_POINTS = [
+    {"x": x, "y": y} for x, y in [
+        (450, 58), (1090, 58), (1120, 88), (1120, 630), (1090, 660),
+        (450, 660), (420, 690), (420, 740), (390, 770), (70, 770),
+        (40, 740), (40, 390), (70, 360), (390, 360), (420, 330),
+        (420, 88), (450, 58),
+    ]
+]
+RAIL_LENGTH = route_length(RAIL_POINTS)
 STATIONS = {
     "market": {
         "id": "station:market",
@@ -820,58 +828,19 @@ def _rail_distance(start: dict, destination: dict) -> float:
 
 
 def _rail_position(distance: float) -> dict[str, int]:
-    position = distance % RAIL_LENGTH
-    if position <= RAIL_TOP:
-        return {"x": round(450 + position), "y": 58}
-    position -= RAIL_TOP
-    if position <= RAIL_CURVE:
-        angle = -90 + position / RAIL_CURVE * 90
-        return {
-            "x": round(1090 + 30 * cos(radians(angle))),
-            "y": round(88 + 30 * sin(radians(angle))),
-        }
-    position -= RAIL_CURVE
-    if position <= RAIL_SIDE:
-        return {"x": 1120, "y": round(88 + position)}
-    position -= RAIL_SIDE
-    if position <= RAIL_CURVE:
-        angle = position / RAIL_CURVE * 90
-        return {
-            "x": round(1090 + 30 * cos(radians(angle))),
-            "y": round(630 + 30 * sin(radians(angle))),
-        }
-    position -= RAIL_CURVE
-    if position <= RAIL_TOP:
-        return {"x": round(1090 - position), "y": 660}
-    position -= RAIL_TOP
-    if position <= RAIL_CURVE:
-        angle = 90 + position / RAIL_CURVE * 90
-        return {
-            "x": round(450 + 30 * cos(radians(angle))),
-            "y": round(630 + 30 * sin(radians(angle))),
-        }
-    position -= RAIL_CURVE
-    if position <= RAIL_SIDE:
-        return {"x": 420, "y": round(630 - position)}
-    position -= RAIL_SIDE
-    angle = 180 + position / RAIL_CURVE * 90
-    return {
-        "x": round(450 + 30 * cos(radians(angle))),
-        "y": round(88 + 30 * sin(radians(angle))),
-    }
+    return position_on_route(RAIL_POINTS, (distance % RAIL_LENGTH) / RAIL_LENGTH)
 
 
 def rail_track() -> list[dict]:
-    """Sample the authoritative rail geometry for track and coach rendering."""
-    lengths = [RAIL_TOP, RAIL_CURVE, RAIL_SIDE, RAIL_CURVE] * 2
-    points = [{"distance": 0.0, **_rail_position(0)}]
+    """Use the same winding loop for simulation, stations, and coach rendering."""
+    points = []
     distance = 0.0
-    for index, length in enumerate(lengths):
-        steps = 16 if index % 2 else 1
-        for step in range(1, steps + 1):
-            sample = distance + length * step / steps
-            points.append({"distance": sample, **_rail_position(sample)})
-        distance += length
+    previous = None
+    for point in RAIL_POINTS:
+        if previous:
+            distance += hypot(point["x"] - previous["x"], point["y"] - previous["y"])
+        points.append({"distance": distance, **point})
+        previous = point
     return points
 
 
@@ -1325,7 +1294,7 @@ def _advance_step(world: dict, seconds: int) -> dict:
     current_minutes = now.hour * 60 + now.minute
     minute_of_day = now.hour * 60 + now.minute + now.second / 60
     train_state = _service_state(minute_of_day)
-    world["trains"][0].setdefault("track", rail_track())
+    world["trains"][0]["track"] = rail_track()
     world["trains"][0].setdefault("stations", [
         {key: value for key, value in station.items() if key != "distance"}
         for station in STATIONS.values()
