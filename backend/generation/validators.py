@@ -1,4 +1,5 @@
 FOOTPRINTS = {
+    "restaurant": (116, 86),
     "home": (78, 74),
     "bakery": (116, 86),
     "shop": (116, 86),

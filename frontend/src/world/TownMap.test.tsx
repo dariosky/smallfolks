@@ -1,3 +1,4 @@
+import { BuildingStatus } from "./BuildingStatus";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import type { World } from "../api/world";
@@ -139,6 +140,18 @@ describe("TownMap resident illustrations", () => {
     expect(markup).toContain("translate(133px, 205px)");
   });
 
+  it("shows planting props only while the citizen is planting", () => {
+    const renderActivity = (activity: string) => renderToStaticMarkup(
+      <TownMap world={{ ...world, people: [{ ...world.people[0], activity }] }} selectedId={null} onSelect={() => {}} />,
+    );
+    const planting = renderActivity("Volunteering: planting trees");
+    for (const cue of ["planting-sow", "planting-seed", "planting-can", "planting-water-drops", "planting-sapling"]) {
+      expect(planting).toContain(cue);
+    }
+    expect(planting).toContain("Planting trees");
+    expect(renderActivity("Walking to a town hall tree-planting parcel")).not.toContain("planting-scene");
+  });
+
   it("gives civic buildings their own map symbols", () => {
     const places = [
       ["post-office", "Little Post"],
@@ -147,6 +160,7 @@ describe("TownMap resident illustrations", () => {
       ["clinic", "Oak Clinic"],
       ["library", "Willow Library"],
       ["lantern-bar", "The Lantern Bar"],
+      ["restaurant", "The Olive Table"],
     ].map(([id, name], index) => ({
       id: `place:${id}`,
       name,
@@ -163,6 +177,7 @@ describe("TownMap resident illustrations", () => {
       "clinic-cross",
       "library-book",
       "bar-lantern",
+      "landmark-restaurant",
     ]) {
       expect(markup).toContain(symbol);
     }
@@ -215,7 +230,7 @@ describe("TownMap resident illustrations", () => {
     };
     const markup = renderToStaticMarkup(
       <TownMap
-        world={{ ...world, places: [home], people: [] }}
+        world={{ ...world, places: [home], people: [{ ...world.people[0], target_place_id: home.id }] }}
         selectedId={home.id}
         onSelect={() => {}}
       />,
@@ -249,7 +264,7 @@ it("renders a walled mansion with two parking bays and shows its villa price and
   };
   const mansionWorld = { ...world, places: [mansion], map_size: { width: 1200, height: 1450 }, people: [] };
   const markup = renderToStaticMarkup(<TownMap world={mansionWorld} selectedId={mansion.id} onSelect={() => {}} />);
-  expect(markup).toContain('viewBox="0 0 1200 1450"');
+  expect(markup).toContain('viewBox="0 -100 1200 1650"');
   expect(markup).toContain('class="mansion-estate"');
   expect(markup).toContain("Two driveway parking spaces");
   expect(markup).toContain("South-facing driveway gate");
@@ -263,4 +278,50 @@ it("renders a walled mansion with two parking bays and shows its villa price and
   const saving = renderToStaticMarkup(<ResidentProsperity world={mansionWorld} person={buyer} />);
   expect(saving).toContain("Villa price:");
   expect(saving).toContain("€15,000.00");
+});
+
+
+describe("building operations", () => {
+  const state = {
+    is_open: false, status: "Closed — day off", reason: "No shifts scheduled today.",
+    closed_since: "2031-05-16T17:00:00", next_open_at: "2031-05-19T08:00:00",
+  };
+  it("shows closure details in the inspector including dates and the next shift", () => {
+    const markup = renderToStaticMarkup(<BuildingStatus state={state} />);
+    expect(markup).toContain("Closed — day off");
+    expect(markup).toContain("No shifts scheduled today.");
+    expect(markup).toContain("May 16, 2031");
+    expect(markup).toContain("May 19, 2031");
+    expect(markup).toContain("Next scheduled opening:");
+    const unknown = renderToStaticMarkup(<BuildingStatus state={{ ...state, closed_since: null }} />);
+    expect(unknown).toContain("Closure time was not recorded.");
+  });
+  it("removes smoke and adds a sign when a working building closes", () => {
+    const library = { id: "place:library", name: "Willow Library", kind: "workplace", position: { x: 535, y: 590 }, operating_state: state };
+    const closed = renderToStaticMarkup(<TownMap world={{ ...world, places: [library] }} selectedId={null} onSelect={() => {}} />);
+    expect(closed).not.toContain('class="chimney-smoke"');
+    expect(closed).toContain('class="building-closed-sign"');
+    expect(closed).toContain("Willow Library, workplace, Closed — day off");
+    const open = renderToStaticMarkup(<TownMap world={{ ...world, places: [{ ...library, operating_state: { ...state, is_open: true, status: "Open", closed_since: null, next_open_at: null } }] }} selectedId={null} onSelect={() => {}} />);
+    expect(open).toContain('class="chimney-smoke"');
+    expect(open).not.toContain('class="building-closed-sign"');
+  });
+});
+
+
+it("keeps completed loans visible in the bank history alongside outstanding loans", () => {
+  const loan = {
+    id: "loan:old", borrower_id: world.people[0].id, purpose: "car", principal_cents: 60000,
+    interest_cents: 4800, interest_percent: 8, remaining_cents: 0, installment_cents: 1080,
+    next_payment_date: "2031-07-12", term_days: 60, status: "repaid" as const,
+    missed_payments: 0, arrears_cents: 0, issued_at: "2031-05-12T10:00:00", repaid_at: "2031-07-11T00:00:00",
+  };
+  const markup = renderToStaticMarkup(<BankDetails world={{ ...world, loans: [loan, { ...loan, id: "loan:new", status: "active", remaining_cents: 64800, repaid_at: undefined }] }} />);
+  expect(markup).toContain("Loan history");
+  expect(markup).toContain("2 issued · 1 repaid · 1 outstanding");
+  expect(markup).toContain("Completed: 2031-07-11");
+  expect(markup).toContain("Issued: 2031-05-12");
+  expect(markup).toContain("Borrowed:");
+  expect(markup).toContain("car loan:</strong> repaid");
+  expect(markup).toContain("car loan:</strong> active");
 });

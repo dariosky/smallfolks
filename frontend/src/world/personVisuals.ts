@@ -2,6 +2,7 @@ export type ActivityKind =
   | "sleep"
   | "read"
   | "garden"
+  | "plant"
   | "call"
   | "chores"
   | "hobby"
@@ -20,6 +21,7 @@ export function activityKind(activity?: string, role?: string): ActivityKind {
   const value = (activity ?? "").toLowerCase();
   if (value.startsWith("sleeping")) return "sleep";
   if (value.startsWith("reading")) return "read";
+  if (value.startsWith("volunteering: planting trees")) return "plant";
   if (value.startsWith("tending the garden")) return "garden";
   if (value.startsWith("calling")) return "call";
   if (value.startsWith("doing household chores")) return "chores";
@@ -42,6 +44,7 @@ export const activityLabels: Record<ActivityKind, string> = {
   sleep: "Sleeping",
   read: "Reading",
   garden: "Gardening",
+  plant: "Planting trees",
   call: "Calling",
   chores: "Chores",
   hobby: "Hobby",

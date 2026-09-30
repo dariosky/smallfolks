@@ -83,6 +83,13 @@ def test_loan_funds_car_once_and_returns_principal_plus_interest():
         assert loan["remaining_cents"] == remaining
     assert loan["status"] == "repaid"
     assert loan["remaining_cents"] == 0
+    assert loan["repaid_at"] == (now + timedelta(days=60)).isoformat(timespec="seconds")
+    world["events"] = []
+    world["economy"]["ledger"] = []
+    loaded = migrate_snapshot(world)
+    assert loaded["loans"] == world["loans"]
+    collect_loan_payments(loaded, now + timedelta(days=61))
+    assert loaded["loans"] == world["loans"]
     assert world["economy"]["bank_cents"] == bank_before + 4800
     assert cash_total(world) == total + 100_000
 
@@ -296,17 +303,88 @@ def test_partial_repayment_reduces_debt_and_keeps_the_unpaid_balance_due():
     assert loan["status"] == "overdue"
 
 
-def test_engine_finishes_paid_construction_over_two_work_days():
+def test_engine_house_upgrade_stays_in_progress_after_the_first_work_day():
     world = build_fixture(7341)
     person = resident(world)
     person["money_cents"] = 200_000
     assert start_expansion(
         world, person, place(world), datetime.fromisoformat(world["clock"])
     )
-    advance(world, 30 * 60)
+    advance(world, 10 * 60)
     project = world["construction_projects"][0]
+    assert project["status"] == "building"
+    assert 0 < project["worked_seconds"] < project["required_seconds"]
+    assert project["required_seconds"] == 7 * 8 * 60 * 60
+    assert place(world).get("house_style") != "large"
+    assert world["economy"]["construction_cents"] > 0
+
+
+def test_expansion_requires_seven_full_work_days():
+    world = build_fixture(7341)
+    person = resident(world)
+    person["money_cents"] = 200_000
+    now = datetime.fromisoformat(world["clock"])
+    assert start_expansion(world, person, place(world), now)
+    total = cash_total(world)
+    assign_construction(world)
+    project = world["construction_projects"][0]
+    worker = resident(world, project["worker_id"].split(":")[1])
+    for day in range(6):
+        work_on_expansion(world, worker, project, 8 * 60 * 60, now + timedelta(days=day))
+        assert project["status"] == "building"
+        assert place(world).get("house_style") != "large"
+    work_on_expansion(world, worker, project, 8 * 60 * 60, now + timedelta(days=6))
     assert project["status"] == "completed"
-    assert project["worked_seconds"] == project["required_seconds"]
-    assert place(world)["house_style"] == "large"
-    assert place(world)["driveway"]
     assert world["economy"]["construction_cents"] == 0
+    assert cash_total(world) == total
+
+
+def test_unfinished_legacy_expansion_keeps_progress_price_and_balanced_wages():
+    from simulation.economy import WAGE_CENTS_PER_MINUTE, transfer
+    from simulation.prosperity import ensure_prosperity
+
+    world = build_fixture(7341)
+    person = resident(world)
+    person["money_cents"] = 200_000
+    now = datetime.fromisoformat(world["clock"])
+    assert start_expansion(world, person, place(world), now)
+    assign_construction(world)
+    project = world["construction_projects"][0]
+    worker = resident(world, project["worker_id"].split(":")[1])
+    # Recreate the former eight-hour contract and its wage escrow.
+    old_required = 8 * 60 * 60
+    extra = (CONSTRUCTION_SECONDS - old_required) // 60 * WAGE_CENTS_PER_MINUTE
+    assert transfer(world, "construction", "outside", extra, "Legacy materials", now)
+    project["required_seconds"] = old_required
+    work_on_expansion(world, worker, project, 60 * 60, now)
+    balance = person["money_cents"]
+    total = cash_total(world)
+    loaded = migrate_snapshot(world)
+    project = loaded["construction_projects"][0]
+    assert project["required_seconds"] == CONSTRUCTION_SECONDS
+    assert project["worked_seconds"] == project["paid_work_seconds"] == 60 * 60
+    assert resident(loaded)["money_cents"] == balance
+    before = deepcopy(loaded)
+    ensure_prosperity(loaded)
+    assert loaded == before
+    worker = resident(loaded, project["worker_id"].split(":")[1])
+    work_on_expansion(loaded, worker, project, CONSTRUCTION_SECONDS, now + timedelta(days=8))
+    assert loaded["economy"]["construction_cents"] == 0
+    assert cash_total(loaded) == total
+
+
+@pytest.mark.parametrize(
+    ('project_id', 'status', 'duration'),
+    [('construction:place:rowan-1:driveway', 'building', 2 * 60 * 60),
+     ('construction:place:rowan-1', 'completed', 8 * 60 * 60)],
+)
+def test_longer_expansions_preserve_driveway_contracts_and_completed_upgrades(project_id, status, duration):
+    from simulation.prosperity import ensure_prosperity
+
+    world = build_fixture(7341)
+    world['construction_projects'].append({
+        'id': project_id, 'status': status, 'required_seconds': duration,
+    })
+    before = deepcopy(world)
+    ensure_prosperity(world)
+    assert world == before

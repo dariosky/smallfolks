@@ -1,6 +1,7 @@
 from datetime import datetime, timedelta
 from math import atan2, ceil, degrees, hypot
 
+from simulation.buildings import update_building_status
 from simulation.economy import (
     BUSINESS_HOURS,
     can_pay,
@@ -38,6 +39,8 @@ from simulation.routing import (
     road_route,
     route_length,
 )
+from simulation.schedules import ensure_schedules, sleep_window
+from simulation.volunteering import run_volunteering
 
 WALKING_SPEED = 18
 DRIVING_SPEED = 90
@@ -110,8 +113,6 @@ HOME_MEAL_HUNGER_THRESHOLD = 55
 MEAL_WINDOW_HUNGER_THRESHOLD = 35
 HOME_ACTIVITY_MINUTES = 15
 SLEEP_REST_THRESHOLD = 60
-BEDTIME_START_MINUTE = 22 * 60
-WAKE_TIME_MINUTE = 6 * 60
 SOCIAL_NEED_THRESHOLD = 60
 ENTERTAINMENT_BOREDOM_THRESHOLD = 45
 PET_WALK_WARNING_SECONDS = 10 * 60 * 60
@@ -119,7 +120,7 @@ PET_WALK_DURATION_SECONDS = 20 * 60
 PET_CLEANUP_DURATION_SECONDS = 20 * 60
 LOGICAL_TICK_SECONDS = 15
 NEED_PERIOD_SECONDS = {"hunger": 12 * 60, "rest": 20 * 60, "social": 30 * 60}
-MINIMUM_STAFF = {"shop": 1, "bakery": 1, "bar": 1, "workplace": 1}
+MINIMUM_STAFF = {"shop": 1, "bakery": 1, "bar": 1, "restaurant": 1, "workplace": 1}
 
 
 def _place(world: dict, place_id: str) -> dict:
@@ -164,6 +165,7 @@ def _is_business_open_and_staffed(world: dict, place: dict, current_minutes: int
     minimum_staff = MINIMUM_STAFF.get(place["kind"], 0)
     working_staff = sum(
         person["workplace_id"] == place["id"]
+        and datetime.fromisoformat(world["clock"]).weekday() in person.get("work_days", range(5))
         and person.get("shift_start_minute", 8 * 60)
         <= current_minutes
         < person.get("shift_end_minute", 17 * 60)
@@ -175,10 +177,6 @@ def _is_business_open_and_staffed(world: dict, place: dict, current_minutes: int
 
 def _is_meal_time(current_minutes: int) -> bool:
     return 12 * 60 <= current_minutes < 13 * 60 or 19 * 60 <= current_minutes < 20 * 60
-
-
-def _is_bedtime(current_minutes: int) -> bool:
-    return current_minutes >= BEDTIME_START_MINUTE or current_minutes < WAKE_TIME_MINUTE
 
 
 def _consume_daily_food(world: dict, now: datetime) -> None:
@@ -1306,6 +1304,7 @@ def advance_seconds(world: dict, seconds: int) -> dict:
 
 
 def _advance_step(world: dict, seconds: int) -> dict:
+    ensure_schedules(world)
     ensure_economy(world)
     ensure_prosperity(world)
     previous = datetime.fromisoformat(world["clock"])
@@ -1358,7 +1357,8 @@ def _advance_step(world: dict, seconds: int) -> dict:
         shift_end = person.get("shift_end_minute", 17 * 60)
         unemployed = work.get("business", {}).get("status") == "bankrupt"
         person["employment_status"] = "out of work" if unemployed else "employed"
-        if unemployed:
+        working_today = now.weekday() in person["work_days"] and not unemployed
+        if not working_today:
             shift_start = shift_end = 0
         commute_minutes = _walking_minutes(home, work)
         commute_start = shift_start - commute_minutes
@@ -1370,6 +1370,23 @@ def _advance_step(world: dict, seconds: int) -> dict:
         if person.get("train_trip"):
             _run_train_trip(world, person, now, train_state)
             continue
+        bedtime, wake = sleep_window(person, work, now, commute_minutes)
+        if bedtime <= now < wake and not (working_today and commute_start <= current_minutes < shift_end):
+            if _at_place(person, home):
+                _sleep_at_home(person, home, now)
+                person["next_commitment"] = f"Wake at {wake:%H:%M}"
+                person["explanation"] = "Their personal sleep routine allows rest before the next day's commitments."
+            else:
+                _walk_from_current_position(
+                    world, person, home, f"Wake at {wake:%H:%M}", "Walking home to sleep",
+                    "It is their bedtime, so this resident is heading home to sleep.",
+                )
+            continue
+        if not (working_today and commute_start <= current_minutes < shift_end):
+            free_until = commute_start if working_today and current_minutes < commute_start else 18 * 60
+            if run_volunteering(world, person, now, seconds, free_until, unemployed,
+                                _walk_from_current_position, _at_place):
+                continue
         if person.get("vehicle_purchase") and 9 * 60 <= current_minutes < 20 * 60:
             model = person["vehicle_purchase"]["model"]
             cost = SPORTS_CAR_PRICE if model == "sports" else CAR_PRICE
@@ -1402,7 +1419,7 @@ def _advance_step(world: dict, seconds: int) -> dict:
                 continue
         project = next((project for project in world["construction_projects"]
                         if project["worker_id"] == person["id"] and project["status"] == "building"), None)
-        if project and 9 * 60 <= current_minutes < 17 * 60:
+        if project and working_today and 9 * 60 <= current_minutes < 17 * 60:
             site = _place(world, project["home_place_id"])
             if not _at_place(person, site):
                 _walk_from_current_position(
@@ -1415,15 +1432,6 @@ def _advance_step(world: dict, seconds: int) -> dict:
                 _move_to(person, site, "Working on a house expansion", "This carpenter is completing a paid building contract.", "Finish the home and driveway")
                 if seconds:
                     work_on_expansion(world, person, project, seconds, now)
-            continue
-        if _is_bedtime(current_minutes) and not shift_start <= current_minutes < shift_end:
-            if _at_place(person, home):
-                _sleep_at_home(person, home, now)
-            else:
-                _walk_from_current_position(
-                    world, person, home, "Sleep at home", "Walking home to sleep",
-                    "It is bedtime, so this resident is heading home to sleep.",
-                )
             continue
         if commute_start <= current_minutes < shift_end and not _at_place(person, work) and shift_start == 8 * 60:
             train_journey = _train_journey({"position": person["position"]}, work, now)
@@ -1482,7 +1490,7 @@ def _advance_step(world: dict, seconds: int) -> dict:
             if seconds:
                 pay_work_seconds(world, person, seconds, now)
         else:
-            if current_minutes < commute_start:
+            if working_today and current_minutes < commute_start:
                 if not _at_place(person, home):
                     _walk_from_current_position(
                         world, person, home, "Rest at home", "Walking home",
@@ -1536,6 +1544,44 @@ def _advance_step(world: dict, seconds: int) -> dict:
             if plan and plan["date"] != now.date().isoformat():
                 person.pop("evening_plan")
                 plan = None
+            restaurant = _place(world, "place:restaurant")
+            meal_slot = "lunch" if current_minutes < 15 * 60 else "dinner"
+            meal_key = f"{now.date().isoformat()}:{meal_slot}"
+            dining = person.get("restaurant_plan")
+            available = _is_business_open_and_staffed(world, restaurant, current_minutes)
+            if dining and (dining["meal_key"] != meal_key or needs_sleep
+                           or (dining["phase"] == "travel" and not available)):
+                person.pop("restaurant_plan", None)
+                dining = None
+            if (dining or (needs_meal and _is_meal_time(current_minutes)
+                          and person.get("restaurant_meal_key") != meal_key
+                          and person["restaurant_inclination"] >= 0.6
+                          and available and can_pay(world, person["id"], price_cents(restaurant)))):
+                if dining is None:
+                    dining = {"meal_key": meal_key, "phase": "travel"}
+                    person["restaurant_plan"] = dining
+                    person.pop("evening_plan", None)
+                if not _at_place(person, restaurant):
+                    _walk_from_current_position(world, person, restaurant, f"Eat {meal_slot} out",
+                                                f"Walking to {restaurant['name']}",
+                                                "Hunger and a preference for dining out made a restaurant meal appealing.")
+                    continue
+                if dining["phase"] == "travel":
+                    if not purchase(world, person["id"], restaurant, 1, "restaurant", now):
+                        person.pop("restaurant_plan", None)
+                        continue
+                    dining.update({"phase": "eating", "started_at_seconds": simulation["elapsed_seconds"]})
+                    person["restaurant_meal_key"] = meal_key
+                if simulation["elapsed_seconds"] - dining["started_at_seconds"] < 30 * 60:
+                    minute_key = now.isoformat(timespec="minutes")
+                    if now.minute % 5 == 0 and person.get("last_meal_minute") != minute_key:
+                        person["needs"]["hunger"] = max(0, person["needs"]["hunger"] - 18)
+                        person["needs"]["social"] = max(0, person["needs"]["social"] - 4)
+                        person["last_meal_minute"] = minute_key
+                    _move_to(person, restaurant, f"Eating {meal_slot} at {restaurant['name']}",
+                             "Enjoying a paid meal out; food and company ease hunger and social needs.", "Return home after the meal")
+                    continue
+                person.pop("restaurant_plan", None)
             if needs_meal and household["food_servings"] > 0 or needs_sleep:
                 person.pop("evening_plan", None)
                 if not _at_place(person, home):
@@ -1721,5 +1767,6 @@ def _advance_step(world: dict, seconds: int) -> dict:
             if pippin["walk_status"] != "comfortable"
             else "Pippin is safe at home and has plenty of walk autonomy remaining."
         )
+    update_building_status(world, observed=True)
     world["events"] = world["events"][-12:]
     return world

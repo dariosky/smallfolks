@@ -3,6 +3,7 @@
 from datetime import datetime, timedelta
 
 BUSINESS_IDS = {
+    "place:restaurant",
     "place:bakery",
     "place:supermarket",
     "place:florist",
@@ -20,6 +21,7 @@ CINEMA_VISIT_CENTS = 1_000
 TAKEOVER_CAPITAL_CENTS = 8_000
 PRICE_PERCENT_OPTIONS = (70, 80, 90, 100, 110, 120, 130)
 BUSINESS_HOURS = {
+    "place:restaurant": (11 * 60, 22 * 60),
     "place:supermarket": (8 * 60, 20 * 60),
     "place:florist": (9 * 60, 18 * 60),
     "place:bakery": (6 * 60, 18 * 60),
@@ -29,6 +31,7 @@ BUSINESS_HOURS = {
 # The fixture renders 15 named residents, while these customers represent the
 # rest of the town. They are counted as sales, never as on-map visits.
 REGIONAL_CUSTOMERS_PER_HOUR = {
+    "place:restaurant": 4,
     "place:bakery": 4,
     "place:supermarket": 5,
     "place:florist": 4,
@@ -36,6 +39,7 @@ REGIONAL_CUSTOMERS_PER_HOUR = {
     "place:cinema": 5,
 }
 BASE_PRICES_CENTS = {
+    "place:restaurant": 1_500,
     "place:bakery": 600,
     "place:supermarket": 250,
     "place:florist": 800,
@@ -64,6 +68,12 @@ def ensure_economy(world: dict) -> dict:
             business = place.setdefault("business", {})
             business.setdefault("balance_cents", STARTING_BUSINESS_CENTS)
             business.setdefault("status", "open")
+            if business["status"] == "bankrupt" and "closed_at" not in business:
+                closure = next((event for event in reversed(world.get("events", []))
+                                if event["summary"].startswith(f"{place['name']} closed")), None)
+                business["closed_at"] = closure["at"] if closure and "T" in closure["at"] else None
+                if closure:
+                    business["closure_reason"] = closure["summary"]
             business.setdefault("price_percent", 100)
             business["base_unit_price_cents"] = BASE_PRICES_CENTS[place["id"]]
             business["unit_price_cents"] = price_cents(place)
@@ -264,6 +274,8 @@ def take_over_business(
     business["debts"] = []
     business["debt_cents"] = 0
     business["status"] = "open"
+    business.pop("closed_at", None)
+    business.pop("closure_reason", None)
     business["owner_id"] = buyer_id
     business["price_percent"] = price_percent
     business["unit_price_cents"] = price_cents(place)
@@ -369,6 +381,8 @@ def pay_work_seconds(world: dict, person: dict, seconds: int, now: datetime) -> 
         if employer != "treasury":
             place = next(place for place in world["places"] if place["id"] == employer)
             place["business"]["status"] = "bankrupt"
+            place["business"]["closed_at"] = now.isoformat(timespec="seconds")
+            place["business"]["closure_reason"] = "Could no longer pay its workers."
             household_share = (
                 wage * world["economy"]["household_contribution_percent"] // 100
             )
@@ -419,6 +433,8 @@ def charge_daily_overhead(world: dict, now: datetime) -> None:
             world, place["id"], "outside", DAILY_OVERHEAD_CENTS, "Operating costs", now
         ):
             business["status"] = "bankrupt"
+            business["closed_at"] = now.isoformat(timespec="seconds")
+            business["closure_reason"] = "Could no longer pay operating costs."
             _record_debt(
                 place, "outside", DAILY_OVERHEAD_CENTS, "Unpaid operating costs"
             )

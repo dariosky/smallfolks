@@ -9,7 +9,7 @@ from simulation.tick import STATIONS, _rail_position
 
 def test_city_households_and_connected_building_access():
     world = build_fixture(7341)
-    assert len(world["people"]) == 30
+    assert len(world["people"]) == 32
     sizes = Counter(len(household["member_ids"]) for household in world["households"])
     assert sizes[1] >= 3 and sizes[3] and sizes[4] >= 2
     validate_place_layout(world["places"])

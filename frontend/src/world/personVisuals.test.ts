@@ -6,6 +6,8 @@ describe("resident visuals", () => {
     ["Sleeping at home", "sleep"],
     ["Reading at home", "read"],
     ["Tending the garden", "garden"],
+    ["Volunteering: planting trees", "plant"],
+    ["Walking to a town hall tree-planting parcel", "walk"],
     ["Calling a friend", "call"],
     ["Doing household chores", "chores"],
     ["Practising a hobby", "hobby"],

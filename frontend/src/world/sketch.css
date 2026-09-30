@@ -1585,3 +1585,224 @@
 .town-map .mansion-gate-pillar { fill: #e2d1b0; stroke: #a19378; stroke-width: 1.5; }
 .town-map .mansion-gate-finial { fill: #c4aa77; stroke: #8f846b; stroke-width: 1; }
 .town-map .mansion-open-gate { fill: none; stroke: #4c655b; stroke-width: 1.8; stroke-linejoin: round; }
+
+/* A permanent compact header above a viewport-sized map. */
+.town-shell.town-shell {
+  width: 100%;
+  max-width: none;
+  height: 100dvh;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.town-shell .town-header {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  margin: 0;
+  padding: 0.4rem 1rem;
+  background: #fffaf0;
+  border-bottom: 2px solid #4b5a50;
+  z-index: 2;
+}
+.town-shell .town-brand {
+  gap: 0.65rem;
+}
+.town-shell .town-brand img {
+  width: 3rem;
+  height: 2.3rem;
+  object-fit: contain;
+}
+.town-shell .town-header h1 {
+  margin: 0;
+  font-size: 1.5rem;
+  text-shadow: 1px 2px 0 #f7ca8e;
+}
+.town-shell .town-layout {
+  position: relative;
+  display: block;
+  flex: 1;
+  min-height: 0;
+  margin: 0;
+}
+.town-shell .map-card {
+  height: 100%;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  overflow: hidden;
+}
+.town-shell .town-map {
+  display: block;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  aspect-ratio: auto;
+  border: 0;
+  touch-action: none;
+  user-select: none;
+  cursor: grab;
+}
+.town-shell .town-map:active {
+  cursor: grabbing;
+}
+.town-shell .map-loading {
+  height: 100%;
+  display: grid;
+  place-items: center;
+}
+.map-toolbar {
+  position: absolute;
+  top: 0.75rem;
+  left: 0.75rem;
+  right: 0.75rem;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  pointer-events: none;
+}
+.map-toolbar > * {
+  pointer-events: auto;
+}
+.town-shell .clock,
+.town-shell .time-controls,
+.zoom-controls {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin: 0;
+  padding: 0.35rem;
+  border: 1px solid #4b5a50;
+  border-radius: 12px;
+  background: #fffaf0;
+  box-shadow: 2px 3px 0 rgba(53, 71, 62, 0.18);
+  transform: none;
+}
+.town-shell .clock {
+  padding: 0.7rem;
+  font-size: 0.9rem;
+}
+.town-shell .time-controls button,
+.zoom-controls button {
+  padding: 0.45rem 0.65rem;
+  font-size: 0.85rem;
+}
+.zoom-controls output {
+  min-width: 3.5rem;
+  text-align: center;
+  font-size: 0.85rem;
+  font-variant-numeric: tabular-nums;
+}
+.town-shell .inspector {
+  position: absolute;
+  top: 5rem;
+  right: 0.75rem;
+  width: min(335px, calc(100% - 1.5rem));
+  max-height: calc(100% - 5.75rem);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 1.1rem;
+  box-shadow: 0 8px 28px rgba(53, 71, 62, 0.24);
+  scrollbar-width: thin;
+}
+.town-shell .inspector > .eyebrow,
+.town-shell .inspector > h2 {
+  padding-right: 2rem;
+}
+.inspector-close {
+  position: absolute;
+  top: 0.45rem;
+  right: 0.45rem;
+  display: grid;
+  place-items: center;
+  width: 2rem;
+  height: 2rem;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 50%;
+  background: #fffaf0;
+  color: var(--ink);
+  font-size: 1.4rem;
+}
+.inspector-close:hover {
+  background: #f3e5c5;
+}
+.town-shell > .error-state {
+  flex: 0 0 auto;
+  margin: 0;
+  border-radius: 0;
+  padding: 0.5rem 1rem;
+}
+@media (max-width: 700px) {
+  .map-toolbar {
+    gap: 0.35rem;
+  }
+  .town-shell .clock {
+    width: 100%;
+    justify-content: center;
+    padding: 0.4rem;
+  }
+  .town-shell .inspector {
+    top: 11rem;
+    max-height: calc(100% - 11.75rem);
+  }
+}
+
+.town-shell .clock span { font-size: 0.9rem; }
+
+.town-map .building-closed-sign rect {
+  fill: #fff5df;
+  stroke: #8e5143;
+  stroke-width: 1.3;
+}
+
+.town-map .building-closed-sign text {
+  fill: #713f36;
+  font-size: 11px;
+  font-weight: 700;
+  text-anchor: middle;
+}
+
+.town-map .mansion-gate-leaf {
+  fill: none;
+  stroke: #4c655b;
+  stroke-width: 1.8;
+  stroke-linejoin: round;
+  transform: rotate(0deg);
+  transition: transform 1s ease-in-out;
+}
+.town-map .mansion-gate.is-open .mansion-gate-left { transform: rotate(-88deg); }
+.town-map .mansion-gate.is-open .mansion-gate-right { transform: rotate(88deg); }
+@media (prefers-reduced-motion: reduce) {
+  .town-map .mansion-gate-leaf { transition: none; }
+}
+
+/* One shared cycle: sow the seed, water it, then reveal the sapling. */
+.town-map .planting-soil { fill: #ad8056; stroke: #73563f; stroke-width: 1.2; }
+.town-map .planting-arm { fill: none; stroke: #d39a72; stroke-width: 3; stroke-linecap: round; }
+.town-map .planting-trowel { fill: #bfc9c8; stroke: #596c68; stroke-width: 1.3; }
+.town-map .planting-seed { fill: #73563f; animation: planting-seed-fall 6s infinite; }
+.town-map .planting-sow { animation: planting-sow 6s infinite; transform-origin: 8px 0; }
+.town-map .planting-water { animation: planting-water 6s infinite; }
+.town-map .planting-can { fill: #7db8bb; stroke: #486d73; stroke-width: 1.5; transform-origin: 17px 7px; animation: planting-can-tip 6s infinite; }
+.town-map .planting-can-handle { fill: none; }
+.town-map .planting-water-drops { fill: none; stroke: #67b8d5; stroke-width: 2; stroke-linecap: round; animation: planting-water-fall 6s linear infinite; }
+.town-map .planting-stem { fill: none; stroke: #577f47; stroke-width: 2; }
+.town-map .planting-leaves { fill: #8abf6c; stroke: #577f47; stroke-width: 1.2; }
+.town-map .planting-sapling { transform-origin: 30px 23px; animation: planting-sprout 6s ease-in-out infinite; }
+.town-map .activity-plant .person-body { transform-origin: 0 15px; animation: planting-bend 6s ease-in-out infinite; }
+@keyframes planting-sow { 0%, 30% { opacity: 1; } 10%, 25% { transform: rotate(12deg); } 35%, 100% { opacity: 0; } }
+@keyframes planting-seed-fall { 0%, 12% { transform: translateY(0); opacity: 0; } 15% { opacity: 1; } 28% { transform: translateY(9px); opacity: 1; } 32%, 100% { transform: translateY(9px); opacity: 0; } }
+@keyframes planting-water { 0%, 32%, 90%, 100% { opacity: 0; } 38%, 83% { opacity: 1; } }
+@keyframes planting-can-tip { 0%, 32%, 90%, 100% { transform: rotate(0); } 42%, 78% { transform: rotate(18deg); } }
+@keyframes planting-water-fall { 0%, 42%, 80%, 100% { opacity: 0; transform: translateY(0); } 46%, 57%, 68% { opacity: 1; transform: translateY(0); } 54%, 65%, 76% { opacity: 0; transform: translateY(6px); } }
+@keyframes planting-sprout { 0%, 25% { opacity: 0; transform: scale(0.1); } 40% { opacity: 1; transform: scale(0.35); } 80%, 95% { opacity: 1; transform: scale(1); } 100% { opacity: 0; transform: scale(1); } }
+@keyframes planting-bend { 0%, 32% { transform: rotate(9deg) translateY(2px); } 40%, 85% { transform: rotate(3deg); } 95%, 100% { transform: rotate(0); } }
+@media (prefers-reduced-motion: reduce) {
+  .town-map .planting-sow, .town-map .planting-seed { opacity: 0; }
+  .town-map .planting-water, .town-map .planting-sapling { opacity: 1; }
+}

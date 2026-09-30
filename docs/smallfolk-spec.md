@@ -462,3 +462,19 @@ Build the narrowest vertical slice that proves the premise:
 4. Save/reload without changing the observable world state.
 
 Only then generalize it into the procedural pipeline and broader town model described above.
+
+### Implemented weekly commitments and dining
+
+Resident `work_days` uses Monday=0 through Sunday=6. Default office, school, workshop, and library jobs run weekdays; shops/bakeries include Saturday; clinic, bar, cinema, and restaurant shifts can run daily. No commuting, wages, or construction shifts begin on days off. Inspectors expose weekly work days.
+
+The Olive Table offers lunch and dinner, with separate 11:00–15:00 and 18:00–22:00 staff. Off-duty residents choose dining during 12:00–13:00 or 19:00–20:00 when hunger, personal inclination, staff availability, and funds allow. Travel persists; payment occurs on arrival, once per meal, and 30 minutes of dining eases hunger and social need. Existing saves receive these fields, restaurant access, and staff additively.
+
+### Building operating status
+
+Workplaces expose persisted operating status, closure reason/time, and the next scheduled opening. Closed buildings show a map sign and omit chimney smoke; occupied, awake households retain smoke. Weekly schedules, hours, and staff activity drive status. Bankruptcy records exact closure time separately from the bounded event feed; legacy saves recover known timestamps from events and display unknown time otherwise. Scheduled closures infer the last shift end and next shift start. Unstaffed automated services (the bank) do not acquire a staff-based closure.
+
+### Town Hall tree-planting work
+
+Citizens may choose a paid volunteering project on an empty planting parcel between 08:00 and 18:00. Unemployed residents seek the small income; nature-inclined residents may choose it when bored and free from paid shifts. A new project needs at least five free hours for travel and four hours of planting, food at home, and sufficient town treasury funds. Scheduled work, urgent hunger/rest and pet care take priority; interrupted projects retain progress. Only time spent at the parcel counts. Each resident starts at most one project per day, and each parcel is reserved for one project.
+
+Completing four hours plants a persistent visible tree and pays €24 from the treasury, using the household wage-sharing setting and the saved ledger. This is a game stipend of €6/hour, below the ordinary €12/hour wage. Parcels are derived from free map space with clearance around buildings, roads and rail. Projects and nature preferences are added to old snapshots without replacing existing state.

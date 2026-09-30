@@ -67,7 +67,7 @@ def test_fixture_world_can_advance_and_reload():
         assert reloaded.json()["clock"] == expected_clock
         assert reloaded.json()["world_format_version"] == WORLD_FORMAT_VERSION
         assert reloaded.json()["revision"] == 1
-        assert len(reloaded.json()["people"]) == 30
+        assert len(reloaded.json()["people"]) == 32
         index = client.get("/api/worlds")
         assert index.status_code == 200
         assert any(item["id"] == world_id for item in index.json())
@@ -157,7 +157,7 @@ def test_render_state_and_inspector_are_available():
         world = client.post("/api/worlds", json={"seed": 222}).json()
         render = client.get(f"/api/worlds/{world['id']}/render-state")
         inspector = client.get(f"/api/worlds/{world['id']}/entities/person:elena")
-        assert len(render.json()["entities"]) == 33
+        assert len(render.json()["entities"]) == 35
         assert inspector.json()["name"] == "Elena Rossi"
 
 
@@ -1026,6 +1026,10 @@ def test_bedtime_yields_to_a_scheduled_late_shift_then_ends_in_the_morning():
     assert elena["activity"] == "Sleeping at home"
 
     world["clock"] = "2031-05-13T06:00:00"
+    advance(world, 0)
+    assert elena["activity"] == "Sleeping at home"
+    wake_time = elena["next_commitment"].removeprefix("Wake at ")
+    world["clock"] = f"2031-05-13T{wake_time}:00"
     advance(world, 0)
     assert elena["activity"] == "At home"
 

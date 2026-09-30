@@ -27,7 +27,7 @@ SHOP_PRICE = 200_000
 CASH_RESERVE = 20_000
 LOAN_TERM_DAYS = 60
 INTEREST_PERCENT = 8  # Fixed charge over the whole game-time loan, not an annual rate.
-CONSTRUCTION_SECONDS = 8 * 60 * 60
+CONSTRUCTION_SECONDS = 7 * 8 * 60 * 60  # Seven full days of on-site work.
 LABOR_CENTS = CONSTRUCTION_SECONDS // 60 * WAGE_CENTS_PER_MINUTE
 
 
@@ -44,6 +44,16 @@ def ensure_prosperity(world: dict) -> None:
     economy.setdefault("construction_cents", 0)
     world.setdefault("loans", [])
     world.setdefault("construction_projects", [])
+    for project in world["construction_projects"]:
+        if (project["status"] != "completed"
+            and not project["id"].endswith(":driveway")
+            and project["required_seconds"] < CONSTRUCTION_SECONDS):
+            extra_labor = (CONSTRUCTION_SECONDS - project["required_seconds"]) // 60 * WAGE_CENTS_PER_MINUTE
+            # Keep the agreed price: move part of the materials budget into wages.
+            if transfer(world, "outside", "construction", extra_labor,
+                        "Reallocate expansion budget for longer construction",
+                        datetime.fromisoformat(world["clock"])):
+                project["required_seconds"] = CONSTRUCTION_SECONDS
     for person in world["people"]:
         person.setdefault("credit_score", 650)
         person.setdefault("income_history", {})
@@ -222,6 +232,7 @@ def collect_loan_payments(world: dict, now: datetime) -> None:
             else "active"
         )
         if loan["status"] == "repaid":
+            loan["repaid_at"] = now.isoformat(timespec="seconds")
             event(
                 world,
                 now,

@@ -4,9 +4,11 @@ from copy import deepcopy
 from typing import Any
 
 from generation.city_layout import ensure_city_layout
+from simulation.buildings import update_building_status
 from simulation.economy import ensure_economy
 from simulation.housing import ensure_home_parking
 from simulation.prosperity import ensure_prosperity
+from simulation.schedules import ensure_schedules
 from simulation.tick import STATIONS, rail_track
 
 WORLD_FORMAT_VERSION = 1
@@ -43,6 +45,14 @@ def migrate_snapshot(state: dict[str, Any]) -> dict[str, Any]:
         )
 
     migrated = deepcopy(state)
+    obsolete_starter_events = {
+        "A clear Monday begins in SmallFolks.",
+        "Bruno is due to walk Pippin in Mossy Common.",
+    }
+    migrated["events"] = [
+        event for event in migrated.get("events", [])
+        if event.get("summary") not in obsolete_starter_events
+    ]
     if source_version == LEGACY_WORLD_FORMAT_VERSION:
         migrated["world_format_version"] = WORLD_FORMAT_VERSION
         migrated.setdefault("revision", 0)
@@ -69,9 +79,11 @@ def migrate_snapshot(state: dict[str, Any]) -> dict[str, Any]:
                 if person.get("activity") == "Working as gardener" and person.get("target_place_id") == person.get("home_place_id"):
                     person["activity"] = "Tending the garden"
                     person["explanation"] = "Gardening at home is a hobby; paid gardening takes place at Fern Florist."
+    ensure_schedules(migrated)
     if migrated.get("generation_version") == "city-10":
         ensure_city_layout(migrated)
     ensure_home_parking(migrated)
     ensure_economy(migrated)
     ensure_prosperity(migrated)
+    update_building_status(migrated)
     return migrated

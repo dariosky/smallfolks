@@ -4,8 +4,17 @@ const API_PREFIX =
   import.meta.env.VITE_API_PREFIX || (import.meta.env.DEV ? "http://127.0.0.1:5340/api" : "/api");
 
 export type Position = { x: number; y: number };
-export type Place = { id: string; name: string; kind: string; position: Position; dealership?: { balance_cents: number; cars_sold: number; standard_price_cents: number; sports_price_cents: number }; house_style?: "large" | "mansion"; owner_household_id?: string | null; sale_price_cents?: number; construction_project_id?: string; driveway?: { parking_position: Position; parking_positions?: Position[]; road_position: Position }; business?: {
+export type BuildingOperatingState = {
+  is_open: boolean;
+  status: string;
+  reason: string;
+  closed_since: string | null;
+  next_open_at: string | null;
+};
+export type Place = { operating_state?: BuildingOperatingState; id: string; name: string; kind: string; position: Position; estate_gate?: Position; dealership?: { balance_cents: number; cars_sold: number; standard_price_cents: number; sports_price_cents: number }; house_style?: "large" | "mansion"; owner_household_id?: string | null; sale_price_cents?: number; construction_project_id?: string; driveway?: { parking_position: Position; parking_positions?: Position[]; road_position: Position }; business?: {
   balance_cents: number;
+  closed_at?: string | null;
+  closure_reason?: string;
   status: string;
   debt_cents: number;
   owner_id: string | null;
@@ -43,6 +52,7 @@ export type Train = {
 };
 export type Loan = {
   id: string; borrower_id: string; purpose: string; principal_cents: number;
+  issued_at?: string; repaid_at?: string;
   interest_cents: number; interest_percent: number; remaining_cents: number;
   installment_cents: number; next_payment_date: string; term_days: number;
   status: "active" | "overdue" | "repaid"; missed_payments: number; arrears_cents: number;
@@ -60,7 +70,21 @@ export type RenderEntity = {
   state: string;
   palette: string;
 };
+export type VolunteeringProject = {
+  id: string;
+  person_id: string;
+  parcel_id: string;
+  position: Position;
+  status: "active" | "completed";
+  worked_seconds: number;
+  required_seconds: number;
+  wage_cents: number;
+  started_at?: string;
+  completed_at?: string;
+};
 export type World = {
+  volunteering_projects?: VolunteeringProject[];
+  planted_trees?: { id: string; position: Position }[];
   loans?: Loan[];
   construction_projects?: ConstructionProject[];
   map_size?: { width: number; height: number };
@@ -109,6 +133,9 @@ export type Entity = {
   carrying_groceries?: boolean;
   role?: string;
   employment_status?: string;
+  work_days?: number[];
+  shift_start_minute?: number;
+  shift_end_minute?: number;
   workplace_id?: string;
   direct_walk?: Record<string, unknown>;
   credit_score?: number;

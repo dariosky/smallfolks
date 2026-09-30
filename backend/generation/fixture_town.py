@@ -2,9 +2,11 @@ from copy import deepcopy
 
 from generation.city_layout import ensure_city_layout
 from generation.validators import validate_place_layout
+from simulation.buildings import update_building_status
 from simulation.economy import ensure_economy
 from simulation.housing import ensure_home_parking
 from simulation.prosperity import ensure_prosperity
+from simulation.schedules import ensure_schedules
 from simulation.tick import STATIONS, rail_track
 from simulation.versions import WORLD_FORMAT_VERSION
 
@@ -337,16 +339,16 @@ def build_fixture(seed: int) -> dict:
                 ],
             }
         ],
-        "events": [
-            {"at": "07:30", "summary": "A clear Monday begins in SmallFolks."},
-            {"at": "07:30", "summary": "Bruno is due to walk Pippin in Mossy Common."},
-        ],
+        "events": [],
     }
     world["map_size"] = {"width": 1200, "height": 1000}
+    ensure_schedules(world)
+    validate_place_layout(world["places"])
     ensure_city_layout(world)
     ensure_home_parking(world)
     ensure_economy(world)
     ensure_prosperity(world)
+    update_building_status(world)
     return world
 
 

@@ -10,6 +10,11 @@ function LoanDetails({ loan }: { loan: Loan }) {
       <strong>{loan.purpose.replace(/_/g, " ")} loan:</strong> {loan.status} ·{" "}
       {money(loan.remaining_cents)} remaining
       <br />
+      Borrowed: {money(loan.principal_cents)} · Interest: {money(loan.interest_cents)} · Repaid: {money(loan.principal_cents + loan.interest_cents - loan.remaining_cents)}
+      <br />
+      Issued: {loan.issued_at ? loan.issued_at.slice(0, 10) : "Date not recorded"}
+      {loan.status === "repaid" && <><br />Completed: {loan.repaid_at ? loan.repaid_at.slice(0, 10) : "Date not recorded"}</>}
+      <br />
       {money(loan.installment_cents)} per game day · {loan.interest_percent}% fixed interest over{" "}
       {loan.term_days} days
       {loan.status !== "repaid" && (
@@ -104,7 +109,7 @@ export function HomeDevelopment({ world, home, onSelect }: { world: World; home:
 }
 
 export function BankDetails({ world, onSelect }: { world: World; onSelect?: (person: Entity) => void }) {
-  const loans = world.loans ?? [];
+  const loans = [...(world.loans ?? [])].reverse();
   return (
     <section className="bank-details">
       <p>
@@ -119,6 +124,8 @@ export function BankDetails({ world, onSelect }: { world: World; onSelect?: (per
       <p>
         <strong>Available funds:</strong> {money(world.economy?.bank_cents ?? 0)}
       </p>
+      <h3>Loan history</h3>
+      <p>{loans.length} issued · {loans.filter((loan) => loan.status === "repaid").length} repaid · {loans.filter((loan) => loan.status !== "repaid").length} outstanding</p>
       {loans.length ? (
         loans.map((loan) => (
           <div key={loan.id}>

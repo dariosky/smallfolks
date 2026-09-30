@@ -1,3 +1,5 @@
+import { TownHallWork } from "../world/TownHallWork";
+import { BuildingStatus } from "../world/BuildingStatus";
 import { useEffect, useState, type FormEvent } from "react";
 import {
   advanceWorld,
@@ -11,8 +13,14 @@ import {
   type Place,
   type World,
 } from "../api/world";
-import { BankDetails, DealershipDetails, HomeDevelopment, ResidentProsperity } from "../world/ProsperityDetails";
+import {
+  BankDetails,
+  DealershipDetails,
+  HomeDevelopment,
+  ResidentProsperity,
+} from "../world/ProsperityDetails";
 import { TownMap } from "../world/TownMap";
+import { readMapCamera, saveMapCamera } from "../world/mapCamera";
 import { ShopPeople } from "../world/ShopPeople";
 import { PersonName } from "../world/PersonName";
 
@@ -45,13 +53,20 @@ export function TownPage() {
   const [selected, setSelected] = useState<Selection | null>(null);
   const [worldId, setWorldId] = useState<string | null>(null);
   const [error, setError] = useState("");
+  const [camera, setCamera] = useState(readMapCamera);
+  const zoom = camera.zoom;
+  const setZoom = (update: (value: number) => number) =>
+    setCamera((current) => ({ ...current, zoom: update(current.zoom) }));
+
+  useEffect(() => {
+    saveMapCamera(camera);
+  }, [camera]);
 
   useEffect(() => {
     void createWorld()
       .then((next) => {
         setWorld(next);
         setWorldId(next.id);
-        setSelected(next.people[0]);
         return resumeWorld(next);
       })
       .then(setWorld)
@@ -115,7 +130,14 @@ export function TownPage() {
     if (!world) return;
     const form = new FormData(event.currentTarget);
     try {
-      setWorld(await takeOverBusiness(world.id, placeId, String(form.get("buyer_id")), Number(form.get("price_percent"))));
+      setWorld(
+        await takeOverBusiness(
+          world.id,
+          placeId,
+          String(form.get("buyer_id")),
+          Number(form.get("price_percent")),
+        ),
+      );
       setError("");
     } catch {
       setError("That resident cannot take over the business at the current balance.");
@@ -145,12 +167,7 @@ export function TownPage() {
     } catch {
       const current = await getWorld(worldToResume.id);
       if (current.simulation.running) return current;
-      return setWorldRunning(
-        current.id,
-        true,
-        current.simulation.speed,
-        current.revision,
-      );
+      return setWorldRunning(current.id, true, current.simulation.speed, current.revision);
     }
   }
 
@@ -163,9 +180,10 @@ export function TownPage() {
   const selectedEntity = currentSelection && isEntity(currentSelection) ? currentSelection : null;
   const selectedPlace = currentSelection && !isEntity(currentSelection) ? currentSelection : null;
   const trainState = world?.trains?.[0]?.state;
-  const selectedStation = selectedPlace?.kind === "station"
-    ? trainState?.stations.find((station) => station.station_id === selectedPlace.id)
-    : undefined;
+  const selectedStation =
+    selectedPlace?.kind === "station"
+      ? trainState?.stations.find((station) => station.station_id === selectedPlace.id)
+      : undefined;
   const selectedHousehold =
     selectedEntity?.household_id && world
       ? world.households.find((household) => household.id === selectedEntity.household_id)
@@ -175,7 +193,7 @@ export function TownPage() {
       ? world.households.find((household) => household.home_place_id === selectedPlace.id)
       : undefined;
   const selectedHomeMembers = selectedHomeHousehold
-    ? world?.people.filter((person) => selectedHomeHousehold.member_ids.includes(person.id)) ?? []
+    ? (world?.people.filter((person) => selectedHomeHousehold.member_ids.includes(person.id)) ?? [])
     : [];
   return (
     <main className="town-shell">
@@ -184,11 +202,7 @@ export function TownPage() {
           <img src="/smallfolks.png" alt="" width="1447" height="1087" />
           <div>
             <h1>SmallFolks</h1>
-            <p>A connected town with lives in motion.</p>
           </div>
-        </div>
-        <div className="clock">
-          <span>{world ? displayTime(world.clock) : "Loading town…"}</span>
         </div>
       </header>
       {error ? <p className="error-state">{error}</p> : null}
@@ -199,38 +213,85 @@ export function TownPage() {
               onSelect={setSelected}
               selectedId={currentSelection?.id ?? null}
               world={world}
+              zoom={zoom}
+              onCameraChange={setCamera}
+              position={camera.position}
+              onPositionChange={(position) => setCamera((current) => ({ ...current, position }))}
             />
           ) : (
             <div className="map-loading">Building the town…</div>
           )}
-          <div className="time-controls">
-            <button
-              className="primary-button"
-              disabled={!world}
-              onClick={() => void advance(15)}
-              type="button"
-            >
-              +15 min
-            </button>
-            <button
-              className="secondary-button"
-              disabled={!world}
-              onClick={() => void advance(60)}
-              type="button"
-            >
-              +1 hour
-            </button>
-            <button
-              className={world?.simulation.running ? "secondary-button is-running" : "secondary-button"}
-              disabled={!world}
-              onClick={() => void toggleRunning()}
-              type="button"
-            >
-              {world?.simulation.running ? "Pause" : "Resume"}
-            </button>
+          <div className="map-toolbar">
+            <div className="clock">
+              <span>{world ? displayTime(world.clock) : "Loading town…"}</span>
+            </div>
+            <div className="time-controls">
+              <button
+                className="primary-button"
+                disabled={!world}
+                onClick={() => void advance(15)}
+                type="button"
+              >
+                +15 min
+              </button>
+              <button
+                className="secondary-button"
+                disabled={!world}
+                onClick={() => void advance(60)}
+                type="button"
+              >
+                +1 hour
+              </button>
+              <button
+                className={
+                  world?.simulation.running ? "secondary-button is-running" : "secondary-button"
+                }
+                disabled={!world}
+                onClick={() => void toggleRunning()}
+                type="button"
+              >
+                {world?.simulation.running ? "Pause" : "Resume"}
+              </button>
+            </div>
+            <div className="zoom-controls" aria-label="Map zoom">
+              <button
+                className="secondary-button"
+                type="button"
+                aria-label="Zoom out"
+                disabled={zoom <= 1}
+                onClick={() => setZoom((value) => Math.max(1, value - 0.25))}
+              >
+                −
+              </button>
+              <output aria-label="Zoom level">{Math.round(zoom * 100)}%</output>
+              <button
+                className="secondary-button"
+                type="button"
+                aria-label="Zoom in"
+                disabled={zoom >= 4}
+                onClick={() => setZoom((value) => Math.min(4, value + 0.25))}
+              >
+                +
+              </button>
+            </div>
           </div>
         </div>
-        <aside className="inspector">
+        {currentSelection && (
+          <aside
+            className="inspector"
+            aria-label="Selection details"
+            onKeyDown={(event) => {
+              if (event.key === "Escape") setSelected(null);
+            }}
+          >
+            <button
+              className="inspector-close"
+              type="button"
+              aria-label="Close details"
+              onClick={() => setSelected(null)}
+            >
+              ×
+            </button>
           {currentSelection ? (
             <>
               <p className="eyebrow">
@@ -243,6 +304,9 @@ export function TownPage() {
                   <p className="activity">{selectedEntity.activity ?? selectedEntity.state}</p>
                   {selectedEntity.employment_status === "out of work" ? (
                     <p><strong>Employment:</strong> Out of work while the workplace is closed.</p>
+                  ) : null}
+                  {selectedEntity.work_days ? (
+                    <p><strong>Work days:</strong> {selectedEntity.work_days.map((day) => ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"][day]).join(", ")}</p>
                   ) : null}
                   <p className="why">
                     <strong>Why now?</strong>
@@ -326,6 +390,9 @@ export function TownPage() {
                 </>
               ) : (
                 <>
+                  {selectedPlace?.operating_state ? (
+                    <BuildingStatus state={selectedPlace.operating_state} />
+                  ) : null}
                   {selectedPlace?.kind === "train" && trainState ? (
                     <section className="train-details">
                       <p><strong>Service:</strong> {trainState.service_state} · 06:00–00:00</p>
@@ -370,11 +437,14 @@ export function TownPage() {
                     )
                   ) : null}
                   {selectedPlace?.kind === "home" && world ? <HomeDevelopment world={world} home={selectedPlace} onSelect={setSelected} /> : null}
+                  {selectedPlace?.id === "place:townhall" && world ? <TownHallWork world={world} onSelect={setSelected} /> : null}
                   {selectedPlace?.id === "place:bank" && world ? <BankDetails world={world} onSelect={setSelected} /> : null}
                   {selectedPlace?.dealership ? <DealershipDetails workshop={selectedPlace} /> : null}
+                  {selectedPlace && (selectedPlace.business || selectedPlace.kind === "workplace") ? (
+                    <ShopPeople place={selectedPlace} people={world?.people ?? []} onSelect={setSelected} />
+                  ) : null}
                   {selectedPlace?.business ? (
                     <section className="business-details">
-                      <ShopPeople place={selectedPlace} people={world?.people ?? []} onSelect={setSelected} />
                       <p><strong>Business:</strong> {selectedPlace.business.status} · {money(selectedPlace.business.balance_cents)}</p>
                       <p><strong>Owner:</strong> <PersonName people={world?.people ?? []} personId={selectedPlace.business.owner_id ?? undefined} onSelect={setSelected} fallback="None" /></p>
                       <p><strong>Price:</strong> {money(selectedPlace.business.unit_price_cents)} {selectedPlace.id === "place:supermarket" ? "per serving" : "per sale"}</p>
@@ -432,7 +502,8 @@ export function TownPage() {
                 </p>
               ))}
           </section>
-        </aside>
+          </aside>
+        )}
       </section>
     </main>
   );
@@ -445,6 +516,7 @@ function labelsFor(kind: string) {
       bakery: "Bakery",
       shop: "Market",
       bar: "Bar",
+      restaurant: "Restaurant",
       workplace: "Workplace",
       park: "Public park",
       vehicle: "Vehicle",

@@ -1167,3 +1167,9 @@ code {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
+
+.townhall-work button {
+  align-items: flex-start;
+  flex-direction: column;
+  gap: 0.25rem;
+}

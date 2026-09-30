@@ -1,5 +1,6 @@
-import type { CSSProperties, KeyboardEvent } from "react";
+import { useEffect, useRef, useState, type CSSProperties, type KeyboardEvent } from "react";
 import "./sketch.css";
+import { MansionGate } from "./MansionGate";
 
 import type { ConstructionProject, Entity, Place, Train, World } from "../api/world";
 import {
@@ -11,6 +12,10 @@ import {
 } from "./personVisuals";
 
 type Props = {
+  zoom?: number;
+  onCameraChange?: (camera: { zoom: number; position: { x: number; y: number } }) => void;
+  position?: { x: number; y: number };
+  onPositionChange?: (position: { x: number; y: number }) => void;
   world: World;
   selectedId: string | null;
   onSelect: (entity: Entity | Place) => void;
@@ -23,11 +28,80 @@ function activate(event: KeyboardEvent<SVGGElement>, action: () => void) {
   }
 }
 
-export function TownMap({ world, selectedId, onSelect }: Props) {
+export function TownMap({ world, selectedId, onSelect, zoom = 1, position, onPositionChange, onCameraChange }: Props) {
+  const svgRef = useRef<SVGSVGElement>(null);
+  const [viewport, setViewport] = useState<{ width: number; height: number } | null>(null);
+  const [localPan, setPan] = useState({ x: 0, y: 0 });
+  const pan = position ?? localPan;
+  const drag = useRef<{ x: number; y: number; panX: number; panY: number; moved: boolean } | null>(
+    null,
+  );
+  useEffect(() => {
+    const svg = svgRef.current;
+    if (!svg) return;
+    const observer = new ResizeObserver(([entry]) => {
+      if (entry.contentRect.width && entry.contentRect.height)
+        setViewport({ width: entry.contentRect.width, height: entry.contentRect.height });
+    });
+    observer.observe(svg);
+    return () => observer.disconnect();
+  }, []);
   const mapSize = world.map_size ?? {
     width: 1200,
-    height: Math.max(720, ...(world.trains?.flatMap((train) => train.track?.map((point) => point.y + 80) ?? []) ?? [])),
+    height: Math.max(
+      720,
+      ...(world.trains?.flatMap((train) => train.track?.map((point) => point.y + 80) ?? []) ?? []),
+    ),
   };
+  const grassMargin = 100;
+  const framedSize = { width: mapSize.width, height: mapSize.height + grassMargin * 2 };
+  const viewportSize = viewport ?? framedSize;
+  const scale =
+    Math.min(viewportSize.width / framedSize.width, viewportSize.height / framedSize.height) * zoom;
+  const cameraWidth = viewportSize.width / scale;
+  const cameraHeight = viewportSize.height / scale;
+  const limitX = Math.max(0, (mapSize.width - cameraWidth) / 2);
+  const limitY = Math.max(0, (framedSize.height - cameraHeight) / 2);
+  const panX = Math.max(-limitX, Math.min(limitX, pan.x));
+  const panY = Math.max(-limitY, Math.min(limitY, pan.y));
+  useEffect(() => {
+    const svg = svgRef.current;
+    if (!svg) return;
+    const handleWheel = (event: WheelEvent) => {
+      event.preventDefault();
+      const deltaUnit = event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? viewportSize.height : 1;
+      const dx = event.deltaX * deltaUnit;
+      const dy = event.deltaY * deltaUnit;
+      if (event.ctrlKey) {
+        if (!onCameraChange) return;
+        const nextZoom = Math.max(1, Math.min(4, zoom * Math.exp(-dy * 0.01)));
+        const nextScale = scale * nextZoom / zoom;
+        const rect = svg.getBoundingClientRect();
+        const offsetX = event.clientX - rect.left - rect.width / 2;
+        const offsetY = event.clientY - rect.top - rect.height / 2;
+        const nextLimitX = Math.max(0, (mapSize.width - viewportSize.width / nextScale) / 2);
+        const nextLimitY = Math.max(0, (framedSize.height - viewportSize.height / nextScale) / 2);
+        onCameraChange({
+          zoom: nextZoom,
+          position: {
+            x: Math.max(-nextLimitX, Math.min(nextLimitX, panX + offsetX / scale - offsetX / nextScale)),
+            y: Math.max(-nextLimitY, Math.min(nextLimitY, panY + offsetY / scale - offsetY / nextScale)),
+          },
+        });
+      } else {
+        const nextPosition = {
+          x: Math.max(-limitX, Math.min(limitX, panX + dx / scale)),
+          y: Math.max(-limitY, Math.min(limitY, panY + dy / scale)),
+        };
+        if (onPositionChange) onPositionChange(nextPosition);
+        else setPan(nextPosition);
+      }
+    };
+    // A native non-passive listener keeps touchpad gestures on the map.
+    svg.addEventListener("wheel", handleWheel, { passive: false });
+    return () => svg.removeEventListener("wheel", handleWheel);
+  }, [zoom, scale, panX, panY, limitX, limitY, mapSize.width, framedSize.height,
+    viewportSize.width, viewportSize.height, onPositionChange, onCameraChange]);
   const selected = world.people.find((person) => person.id === selectedId);
   const trainPassengers = world.people.filter((person) => person.on_train);
   const riverX = mapSize.width - 40;
@@ -42,7 +116,42 @@ export function TownMap({ world, selectedId, onSelect }: Props) {
     <svg
       aria-label="SmallFolks town map"
       className={`town-map ${world.simulation.running ? "" : "is-paused"}`}
-      viewBox={`0 0 ${mapSize.width} ${mapSize.height}`}
+      ref={svgRef}
+      viewBox={`${(mapSize.width - cameraWidth) / 2 + panX} ${(mapSize.height - cameraHeight) / 2 + panY} ${cameraWidth} ${cameraHeight}`}
+      onPointerDown={(event) => {
+        if (event.button !== 0 || !event.isPrimary) return;
+        drag.current = { x: event.clientX, y: event.clientY, panX, panY, moved: false };
+      }}
+      onPointerMove={(event) => {
+        const start = drag.current;
+        if (!start) return;
+        const dx = event.clientX - start.x;
+        const dy = event.clientY - start.y;
+        if (!start.moved && Math.hypot(dx, dy) < 5) return;
+        start.moved = true;
+        event.currentTarget.setPointerCapture(event.pointerId);
+        const nextPosition = {
+          x: Math.max(-limitX, Math.min(limitX, start.panX - dx / scale)),
+          y: Math.max(-limitY, Math.min(limitY, start.panY - dy / scale)),
+        };
+        if (onPositionChange) onPositionChange(nextPosition);
+        else setPan(nextPosition);
+      }}
+      onPointerUp={(event) => {
+        if (event.currentTarget.hasPointerCapture(event.pointerId))
+          event.currentTarget.releasePointerCapture(event.pointerId);
+        if (drag.current && !drag.current.moved) drag.current = null;
+      }}
+      onPointerCancel={() => {
+        drag.current = null;
+      }}
+      onClickCapture={(event) => {
+        if (drag.current?.moved) {
+          event.preventDefault();
+          event.stopPropagation();
+        }
+        drag.current = null;
+      }}
     >
       <defs>
         <linearGradient id="river-water" x1="0" y1="0" x2="1" y2="0">
@@ -71,8 +180,8 @@ export function TownMap({ world, selectedId, onSelect }: Props) {
           <path d="M2 0v12" stroke="#b7a36c" strokeWidth="1.5" opacity=".5" />
         </pattern>
       </defs>
-      <rect className="map-ground" height={mapSize.height} width={mapSize.width} />
-      <rect width={mapSize.width} height={mapSize.height} fill="url(#grass-ink)" pointerEvents="none" />
+      <rect className="map-ground" x={-mapSize.width} y={-grassMargin} height={framedSize.height} width={mapSize.width * 3} />
+      <rect x={-mapSize.width} y={-grassMargin} width={mapSize.width * 3} height={framedSize.height} fill="url(#grass-ink)" pointerEvents="none" />
       <g className="river-water" aria-hidden="true" pointerEvents="none">
         <path className="river-bank" d={riverPath} />
         <path className="river" d={riverPath} />
@@ -128,14 +237,20 @@ export function TownMap({ world, selectedId, onSelect }: Props) {
       ) : null}
       {world.places.map((place) => (
         <Building
+          world={world}
           key={place.id}
           onSelect={onSelect}
           place={place}
           selected={place.id === selectedId}
+          smokeActive={place.kind === "home"
+            ? world.people.some((person) => person.target_place_id === place.id
+              && !person.direct_walk && !person.route && !person.in_vehicle_id && !person.on_train
+              && !person.activity?.startsWith("Sleeping"))
+            : place.operating_state?.is_open === true}
           project={world.construction_projects?.find((project) => project.id === place.construction_project_id)}
         />
       ))}
-      <TownTrees />
+      <TownTrees plantedTrees={world.planted_trees} />
       <TownDetails />
       {(() => {
         const visible = [
@@ -407,12 +522,16 @@ function railPosition(track: NonNullable<Train["track"]>, distance: number) {
 }
 
 function Building({
+  world,
+  smokeActive,
   project,
   place,
   onSelect,
   selected,
 }: {
   place: Place;
+  smokeActive: boolean;
+  world: World;
   project?: ConstructionProject;
   onSelect: Props["onSelect"];
   selected: boolean;
@@ -427,7 +546,7 @@ function Building({
   return (
     <g
       className={`place place-${place.kind} building-color-${variant} ${selected ? "place-selected" : ""}`}
-      aria-label={`${place.name}, ${place.kind}`}
+      aria-label={`${place.name}, ${place.kind}${place.operating_state ? `, ${place.operating_state.status}` : ""}`}
       aria-pressed={selected}
       onClick={() => onSelect(place)}
       onKeyDown={(event) => activate(event, () => onSelect(place))}
@@ -435,7 +554,7 @@ function Building({
       tabIndex={0}
       transform={`translate(${x} ${y})`}
     >
-      <title>{place.name}</title>
+      <title>{`${place.name}${place.operating_state ? `: ${place.operating_state.status}. ${place.operating_state.reason}` : ""}`}</title>
       <rect
         className="place-hit"
         x={isHome ? (mansionHome ? -160 : estateHome ? -54 : largeHome ? -50 : -40) : -64}
@@ -468,7 +587,7 @@ function Building({
           <path className="flower-bed" d="M-51-28h23m-19 5h15" />
         </>
       ) : mansionHome ? (
-        <Mansion place={place} />
+        <Mansion place={place} world={world} />
       ) : estateHome ? (
         <EstateHome />
       ) : (
@@ -481,7 +600,7 @@ function Building({
             <path className="house-roof" d="M-36-12-3-51 32-12Z" />
             <path className="roof-pencil" d="M-25-19h45M-19-27h31M-12-35H5M-5-43h4" />
             <path className="house-chimney" d="M16-32v-20h8v28" />
-            <path className="chimney-smoke" d="M20-58q-8-8 0-15t0-14" />
+            {smokeActive && <path className="chimney-smoke" d="M20-58q-8-8 0-15t0-14" />}
             <path className="house-door" d="M-6 30V10Q1 3 8 10v20Z" />
             <circle className="door-knob" cx="5" cy="20" r="1" />
             <path className="house-window" d="M-23-3h12v14h-12Zm36 0h10v14H13Z" />
@@ -517,6 +636,12 @@ function Building({
           <text className="construction-progress" x="-5" y="63">{Math.round(project.worked_seconds / project.required_seconds * 100)}%</text>
         </g>
       )}
+      {place.operating_state && !place.operating_state.is_open && (
+        <g className="building-closed-sign" aria-label={place.operating_state.status}>
+          <rect x="-27" y="13" width="54" height="18" rx="3" />
+          <text x="0" y="26">Closed</text>
+        </g>
+      )}
       {(!isHome || mansionHome) && (
         <text className="place-name" x="0" y={mansionHome ? 185 : isPark ? 65 : 56}>
           {place.name}
@@ -526,7 +651,7 @@ function Building({
   );
 }
 
-function Mansion({ place }: { place: Place }) {
+function Mansion({ place, world }: { place: Place; world: World }) {
   const roadY = (place.driveway?.road_position.y ?? place.position.y + 210) - place.position.y;
   return (
     <g className="mansion-estate" aria-label="Walled mansion with a vast garden and two parking spaces">
@@ -579,12 +704,7 @@ function Mansion({ place }: { place: Place }) {
       </g>
       <path className="mansion-wall mansion-front-wall" d="M-155 155H-22M22 155H155" />
       <path className="mansion-wall-cap" d="M-155 151H-22M22 151H155" />
-      <g className="mansion-gate" aria-label="South-facing driveway gate">
-        <path className="mansion-gate-pillar" d="M-29 144H-20V161H-29ZM20 144H29V161H20Z" />
-        <circle className="mansion-gate-finial" cx="-24.5" cy="141" r="4" />
-        <circle className="mansion-gate-finial" cx="24.5" cy="141" r="4" />
-        <path className="mansion-open-gate" d="M-20 146L-15 126V146L-20 158M20 146L15 126V146L20 158" />
-      </g>
+      <MansionGate world={world} gate={place.estate_gate ?? { x: place.position.x, y: place.position.y + 155 }} />
     </g>
   );
 }
@@ -663,6 +783,13 @@ function BuildingFeature({ placeId }: { placeId: string }) {
           <text className="school-letters" x="-19" y="20">
             ABC
           </text>
+        </g>
+      );
+    case "place:restaurant":
+      return (
+        <g className="landmark landmark-restaurant" aria-hidden="true">
+          <circle cx="0" cy="-18" r="11" fill="none" stroke="currentColor" strokeWidth="2" />
+          <path d="M-18-29v11m-3-11v7h6v-7m-3 11v12M18-29v23m0-23q-8 10 0 11" fill="none" stroke="currentColor" strokeWidth="2" />
         </g>
       );
     case "place:lantern-bar":
@@ -962,6 +1089,30 @@ function ActivityProp({
           <path className="garden-sprout" d="M29 20v-5m0 2q-4-5-6-3m6 2q3-5 6-3" />
         </>
       )}
+      {kind === "plant" && (
+        <g className="planting-scene">
+          <ellipse className="planting-soil" cx="30" cy="23" rx="14" ry="4" />
+          <g className="planting-sow">
+            <path className="planting-arm" d="M9 0q8 3 13 12" />
+            <path className="planting-trowel" d="m19 9 6 7-3 5-5-8Z" />
+            <circle className="planting-seed" cx="25" cy="13" r="2" />
+          </g>
+          <g className="planting-water">
+            <path className="planting-arm" d="M8 0 16 5" />
+            <g className="planting-can">
+              <path d="M13 1h12v11H13Zm2 0v-5h8v5m2 3 7 5-2 3-5-4" />
+              <path className="planting-can-handle" d="M13 3q-7-3-6 4q0 5 6 3" />
+            </g>
+            <g className="planting-water-drops">
+              <path d="m30 13 1 3m4-1 1 3m-6 1 1 3" />
+            </g>
+          </g>
+          <g className="planting-sapling">
+            <path className="planting-stem" d="M30 23V7" />
+            <path className="planting-leaves" d="M30 15Q17 16 20 7Q29 6 30 15ZM30 11Q31 1 40 3Q43 12 30 11Z" />
+          </g>
+        </g>
+      )}
       {kind === "call" && (
         <>
           <rect className="prop-phone" x="8" y="-11" width="7" height="14" rx="2" />
@@ -1045,6 +1196,7 @@ type WorkStyle =
 
 function workStyleFor(role?: string): WorkStyle {
   switch (role) {
+    case "Chef":
     case "Baker":
       return "bakery";
     case "Mechanic":
@@ -1185,10 +1337,11 @@ function VehicleSprite({ sports, driver, heading, highlighted, onSelect }: { spo
     </g>
   );
 }
-function TownTrees() {
+function TownTrees({ plantedTrees = [] }: { plantedTrees?: { position: { x: number; y: number } }[] }) {
   return (
     <g className="trees">
       {[
+        ...plantedTrees.map(({ position }) => [position.x, position.y]),
         [45, 65],
         [335, 80],
         [330, 290],

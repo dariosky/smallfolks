@@ -9,6 +9,7 @@ from sqlmodel import Session, select
 from db import engine
 from generation.fixture_town import clone_fixture
 from persistence.models import WorldSnapshot
+from simulation.buildings import update_building_status
 from simulation.economy import PRICE_PERCENT_OPTIONS, price_cents, take_over_business
 from simulation.tick import LOGICAL_TICK_SECONDS, advance, advance_seconds
 from simulation.versions import (
@@ -119,6 +120,7 @@ def take_over_world_business(
     with _world_locks[world_id]:
         state = load_world(session, world_id)
         take_over_business(state, place_id, buyer_id, price_percent, datetime.fromisoformat(state["clock"]))
+        update_building_status(state, observed=True)
         state["revision"] = state.get("revision", 0) + 1
         save_world(session, state)
         return state
