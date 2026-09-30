@@ -3,6 +3,9 @@
 from copy import deepcopy
 from typing import Any
 
+from simulation.economy import ensure_economy
+from simulation.tick import STATIONS, rail_track
+
 WORLD_FORMAT_VERSION = 1
 LEGACY_WORLD_FORMAT_VERSION = 0
 
@@ -49,4 +52,19 @@ def migrate_snapshot(state: dict[str, Any]) -> dict[str, Any]:
             "speed": 1.0,
         },
     )
+    for train in migrated.get("trains", []):
+        train.setdefault("track", rail_track())
+        train.setdefault("stations", [
+            {key: value for key, value in station.items() if key != "distance"}
+            for station in STATIONS.values()
+        ])
+    if migrated.get("generation_version") == "poc-9":
+        for person in migrated.get("people", []):
+            if (person.get("id") == "person:bruno"
+                and person.get("workplace_id") in {person.get("home_place_id"), "place:park"}):
+                person["workplace_id"] = "place:florist"
+                if person.get("activity") == "Working as gardener" and person.get("target_place_id") == person.get("home_place_id"):
+                    person["activity"] = "Tending the garden"
+                    person["explanation"] = "Gardening at home is a hobby; paid gardening takes place at Fern Florist."
+    ensure_economy(migrated)
     return migrated

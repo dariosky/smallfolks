@@ -3,6 +3,6 @@ backend/smallfolk.db
 frontend/node_modules/
 frontend/dist/
 !.idea/
+.idea/*
+!.idea/smallfolks.iml
 !.idea/runConfigurations/
-!.idea/runConfigurations/Backend.xml
-!.idea/runConfigurations/Frontend.xml

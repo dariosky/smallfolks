@@ -1,10 +1,12 @@
 from copy import deepcopy
 
 from generation.validators import validate_place_layout
+from simulation.economy import ensure_economy
+from simulation.tick import STATIONS, rail_track
 from simulation.versions import WORLD_FORMAT_VERSION
 
 GENERATION_VERSION = "poc-9"
-SIMULATION_VERSION = "poc-1"
+SIMULATION_VERSION = "poc-3"
 
 PEOPLE = [
     ("person:elena", "Elena Rossi", "place:rowan-1", "place:bakery", "Baker", "baker"),
@@ -62,14 +64,14 @@ PEOPLE = [
         "Nora Klein",
         "place:rowan-5",
         "place:library",
-        "Student",
+        "Library assistant",
         "student",
     ),
     (
         "person:bruno",
         "Bruno Meyer",
         "place:rowan-5",
-        "place:rowan-5",
+        "place:florist",
         "Gardener",
         "gardener",
     ),
@@ -225,7 +227,7 @@ def build_fixture(seed: int) -> dict:
         for household_id, home_id, member_ids, food_servings in HOUSEHOLDS
     ]
     validate_place_layout(places)
-    return {
+    world = {
         "id": f"world:poc-9-{seed}",
         "seed": seed,
         "world_format_version": WORLD_FORMAT_VERSION,
@@ -305,6 +307,11 @@ def build_fixture(seed: int) -> dict:
                 "stops": ["Rowan Halt", "Market Square", "Eastgate"],
                 "capacity": 8,
                 "car_capacity": 4,
+                "track": rail_track(),
+                "stations": [
+                    {key: value for key, value in station.items() if key != "distance"}
+                    for station in STATIONS.values()
+                ],
             }
         ],
         "events": [
@@ -312,6 +319,8 @@ def build_fixture(seed: int) -> dict:
             {"at": "07:30", "summary": "Bruno is due to walk Pippin in Mossy Common."},
         ],
     }
+    ensure_economy(world)
+    return world
 
 
 def clone_fixture(seed: int) -> dict:

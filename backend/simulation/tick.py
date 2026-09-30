@@ -1,6 +1,19 @@
 from datetime import datetime, timedelta
 from math import ceil, cos, hypot, radians, sin
 
+from simulation.economy import (
+    BUSINESS_HOURS,
+    can_pay,
+    charge_daily_overhead,
+    consider_takeovers,
+    ensure_economy,
+    pay_owner_dividends,
+    pay_work_seconds,
+    price_cents,
+    purchase,
+    record_regional_sales,
+    reset_daily_sales,
+)
 from simulation.routing import pedestrian_route, position_on_route, route_length
 
 WALKING_SPEED = 18
@@ -15,31 +28,45 @@ STATIONS = {
         "name": "Market Square",
         "distance": 60,
         "position": {"x": 510, "y": 58},
+        "platform": {"x": -120, "y": -9, "width": 160, "height": 18},
     },
     "eastgate": {
         "id": "station:eastgate",
         "name": "Eastgate",
         "distance": RAIL_TOP + RAIL_CURVE + 172,
         "position": {"x": 1120, "y": 260},
+        "platform": {"x": -9, "y": -120, "width": 18, "height": 160},
     },
     "rowan": {
         "id": "station:rowan",
         "name": "Rowan Halt",
         "distance": RAIL_TOP + RAIL_CURVE + RAIL_SIDE + RAIL_CURVE + 440,
         "position": {"x": 650, "y": 660},
+        "platform": {"x": -40, "y": -9, "width": 160, "height": 18},
     },
+}
+NEXT_STATION = {
+    "station:market": "eastgate",
+    "station:eastgate": "rowan",
+    "station:rowan": "market",
 }
 TRAIN_CAPACITY = 8
 TRAIN_CAR_CAPACITY = 4
-SERVICE_CYCLE_MINUTES = 43
+SERVICE_CYCLE_MINUTES = 45
+SERVICE_START_MINUTE = 6 * 60
+SERVICE_END_MINUTE = 24 * 60
+LAST_CYCLE_START_MINUTE = SERVICE_START_MINUTE + (
+    (SERVICE_END_MINUTE - SERVICE_START_MINUTE) // SERVICE_CYCLE_MINUTES
+) * SERVICE_CYCLE_MINUTES
+BOARDING_SECONDS_PER_PERSON = 15
 SERVICE_DEPARTURES = {"station:market": 3, "station:eastgate": 16, "station:rowan": 31}
 SERVICE_TRAVEL_MINUTES = {
     ("station:market", "station:eastgate"): 10,
     ("station:market", "station:rowan"): 25,
     ("station:eastgate", "station:rowan"): 12,
-    ("station:eastgate", "station:market"): 27,
-    ("station:rowan", "station:market"): 12,
-    ("station:rowan", "station:eastgate"): 25,
+    ("station:eastgate", "station:market"): 29,
+    ("station:rowan", "station:market"): 14,
+    ("station:rowan", "station:eastgate"): 27,
 }
 GROCERY_RESTOCK_DAYS = 3
 GROCERY_BASE_BROWSING_MINUTES = 8
@@ -51,6 +78,8 @@ HOME_MEAL_HUNGER_THRESHOLD = 55
 MEAL_WINDOW_HUNGER_THRESHOLD = 35
 HOME_ACTIVITY_MINUTES = 15
 SLEEP_REST_THRESHOLD = 60
+BEDTIME_START_MINUTE = 22 * 60
+WAKE_TIME_MINUTE = 6 * 60
 SOCIAL_NEED_THRESHOLD = 60
 ENTERTAINMENT_BOREDOM_THRESHOLD = 45
 PET_WALK_WARNING_SECONDS = 10 * 60 * 60
@@ -58,13 +87,6 @@ PET_WALK_DURATION_SECONDS = 20 * 60
 PET_CLEANUP_DURATION_SECONDS = 20 * 60
 LOGICAL_TICK_SECONDS = 15
 NEED_PERIOD_SECONDS = {"hunger": 12 * 60, "rest": 20 * 60, "social": 30 * 60}
-BUSINESS_HOURS = {
-    "place:supermarket": (8 * 60, 20 * 60),
-    "place:florist": (9 * 60, 18 * 60),
-    "place:bakery": (6 * 60, 18 * 60),
-    "place:lantern-bar": (16 * 60, 23 * 60),
-    "place:cinema": (15 * 60, 23 * 60),
-}
 MINIMUM_STAFF = {"shop": 1, "bakery": 1, "bar": 1, "workplace": 1}
 
 
@@ -102,6 +124,8 @@ def _household_needs_groceries(household: dict) -> bool:
 
 
 def _is_business_open_and_staffed(world: dict, place: dict, current_minutes: int) -> bool:
+    if place.get("business", {}).get("status") == "bankrupt":
+        return False
     opening, closing = BUSINESS_HOURS.get(place["id"], (0, 24 * 60))
     if not opening <= current_minutes < closing:
         return False
@@ -119,6 +143,10 @@ def _is_business_open_and_staffed(world: dict, place: dict, current_minutes: int
 
 def _is_meal_time(current_minutes: int) -> bool:
     return 12 * 60 <= current_minutes < 13 * 60 or 19 * 60 <= current_minutes < 20 * 60
+
+
+def _is_bedtime(current_minutes: int) -> bool:
+    return current_minutes >= BEDTIME_START_MINUTE or current_minutes < WAKE_TIME_MINUTE
 
 
 def _consume_daily_food(world: dict, now: datetime) -> None:
@@ -282,7 +310,7 @@ def _sleep_at_home(person: dict, home: dict, now: datetime) -> None:
         person,
         home,
         "Sleeping at home",
-        "They are tired enough that rest takes priority over a social or entertaining evening.",
+        "They are sleeping at home to recover for the next day.",
         "Wake up rested",
     )
 
@@ -379,7 +407,18 @@ def _is_near_place(person: dict, place: dict) -> bool:
     return hypot(
         person["position"]["x"] - destination["x"],
         person["position"]["y"] - destination["y"],
-    ) < 35
+    ) < 55
+
+
+def _at_place(person: dict, place: dict) -> bool:
+    """A destination becomes usable only after its walk has completed."""
+    return (
+        person.get("target_place_id") == place["id"]
+        and not person.get("direct_walk")
+        and not person.get("route")
+        and not person.get("on_train")
+        and _is_near_place(person, place)
+    )
 
 
 def _walk_pet_care_leg(
@@ -395,6 +434,9 @@ def _walk_pet_care_leg(
     elapsed_seconds = world["simulation"]["elapsed_seconds"]
     leg = pet.get("care_leg")
     if leg is None:
+        # Care takes over the person's route; an interrupted commute must be
+        # replanned from wherever the owner finishes the pet task.
+        person.pop("direct_walk", None)
         route = pedestrian_route(person["position"], _position_at(person, destination))
         leg = {
             "owner_id": person["id"],
@@ -417,6 +459,20 @@ def _walk_pet_care_leg(
     person["explanation"] = explanation
     person["next_commitment"] = next_commitment
     person["route"] = leg["route"]
+    person["journey"] = {
+        "id": f"journey:{person['id']}:pet-care:{leg['started_at_seconds']}",
+        "status": "active" if progress < 1 else "complete",
+        "active_leg_index": 0,
+        "legs": [{
+            "id": f"leg:pet-care:{leg['started_at_seconds']}",
+            "mode": "walk",
+            "start_location": {"kind": "route", "edge_id": "pedestrian-route", "progress": 0},
+            "end_location": {"kind": "place", "place_id": destination["id"]},
+            "edge_ids": ["pedestrian-route"],
+            "distance": route_length(leg["route"]),
+            "progress": progress,
+        }],
+    }
     if progress < 1:
         return False
     person["position"] = _position_at(person, destination)
@@ -434,7 +490,7 @@ def _care_for_pet(world: dict, person: dict, pet: dict, now: datetime) -> bool:
         cleaner = _assign_pet_owner(world, pet, "cleanup", now)
         if person["id"] != cleaner:
             return False
-        if not _is_near_place(person, home):
+        if not _at_place(person, home):
             _walk_pet_care_leg(
                 world,
                 person,
@@ -476,7 +532,7 @@ def _care_for_pet(world: dict, person: dict, pet: dict, now: datetime) -> bool:
     pet["walk_status"] = "out for a walk"
     phase = pet.setdefault("walk_phase", "to_home")
     if phase == "to_home":
-        if _is_near_place(person, home):
+        if _at_place(person, home):
             pet["walk_phase"] = "to_park"
         else:
             _walk_pet_care_leg(
@@ -560,79 +616,6 @@ def _move_to(
     person.pop("train_arrival_id", None)
 
 
-def _walk_to(
-    person: dict,
-    start: dict,
-    destination: dict,
-    progress: float,
-    next_commitment: str,
-    activity: str | None = None,
-    explanation: str | None = None,
-) -> None:
-    route = pedestrian_route(
-        _position_at(person, start), _position_at(person, destination)
-    )
-    person["position"] = position_on_route(route, progress)
-    person["target_place_id"] = destination["id"]
-    person["activity"] = activity or f"Walking to {destination['name']}"
-    person["explanation"] = explanation or (
-        f"The {person['role'].lower()} shift starts at 08:00, so the reachable pedestrian route is underway."
-    )
-    person["next_commitment"] = next_commitment
-    person["route"] = route
-    person["journey"] = {
-        "id": f"journey:{person['id']}:{start['id']}:{destination['id']}",
-        "status": "active",
-        "active_leg_index": 0,
-        "legs": [
-            {
-                "id": f"leg:{start['id']}:{destination['id']}",
-                "mode": "walk",
-                "start_location": {"kind": "place", "place_id": start["id"]},
-                "end_location": {"kind": "place", "place_id": destination["id"]},
-                "edge_ids": ["pedestrian-route"],
-                "distance": route_length(route),
-                "progress": min(1, max(0, progress)),
-            }
-        ],
-    }
-
-
-def _walk_station_to(
-    person: dict,
-    start: dict,
-    destination: dict,
-    progress: float,
-    next_commitment: str,
-    activity: str,
-    explanation: str,
-) -> None:
-    """Render station access on a local path at normal pedestrian speed."""
-    route = [_position_at(person, start), _position_at(person, destination)]
-    person["position"] = position_on_route(route, progress)
-    person["target_place_id"] = destination["id"]
-    person["activity"] = activity
-    person["explanation"] = explanation
-    person["next_commitment"] = next_commitment
-    person["route"] = route
-    person["journey"] = {
-        "id": f"journey:{person['id']}:{start['id']}:{destination['id']}",
-        "status": "active",
-        "active_leg_index": 0,
-        "legs": [
-            {
-                "id": f"leg:{start['id']}:{destination['id']}",
-                "mode": "walk",
-                "start_location": {"kind": "place", "place_id": start["id"]},
-                "end_location": {"kind": "place", "place_id": destination["id"]},
-                "edge_ids": ["station-access"],
-                "distance": route_length(route),
-                "progress": min(1, max(0, progress)),
-            }
-        ],
-    }
-
-
 def _walk_from_current_position(
     world: dict,
     person: dict,
@@ -640,12 +623,19 @@ def _walk_from_current_position(
     next_commitment: str,
     activity: str,
     explanation: str,
+    local: bool = False,
 ) -> bool:
     """Continue a route from the person's actual position; never snap to a timed phase."""
     elapsed_seconds = world["simulation"]["elapsed_seconds"]
     walk = person.get("direct_walk")
     if walk is None or walk.get("destination_id") != destination["id"]:
-        route = pedestrian_route(person["position"], _position_at(person, destination))
+        origin = dict(person["position"])
+        destination_position = _position_at(person, destination)
+        route = (
+            [origin, destination_position]
+            if local
+            else pedestrian_route(origin, destination_position)
+        )
         walk = {
             "destination_id": destination["id"],
             "started_at_seconds": elapsed_seconds,
@@ -660,6 +650,20 @@ def _walk_from_current_position(
     person["explanation"] = explanation
     person["next_commitment"] = next_commitment
     person["route"] = walk["route"]
+    person["journey"] = {
+        "id": f"journey:{person['id']}:{walk['started_at_seconds']}:{destination['id']}",
+        "status": "active" if progress < 1 else "complete",
+        "active_leg_index": 0,
+        "legs": [{
+            "id": f"leg:{walk['started_at_seconds']}:{destination['id']}",
+            "mode": "walk",
+            "start_location": {"kind": "route", "edge_id": "pedestrian-route", "progress": 0},
+            "end_location": {"kind": "place", "place_id": destination["id"]},
+            "edge_ids": ["station-access" if local else "pedestrian-route"],
+            "distance": route_length(walk["route"]),
+            "progress": progress,
+        }],
+    }
     if progress < 1:
         return False
     person["position"] = _position_at(person, destination)
@@ -714,6 +718,20 @@ def _rail_position(distance: float) -> dict[str, int]:
     }
 
 
+def rail_track() -> list[dict]:
+    """Sample the authoritative rail geometry for track and coach rendering."""
+    lengths = [RAIL_TOP, RAIL_CURVE, RAIL_SIDE, RAIL_CURVE] * 2
+    points = [{"distance": 0.0, **_rail_position(0)}]
+    distance = 0.0
+    for index, length in enumerate(lengths):
+        steps = 16 if index % 2 else 1
+        for step in range(1, steps + 1):
+            sample = distance + length * step / steps
+            points.append({"distance": sample, **_rail_position(sample)})
+        distance += length
+    return points
+
+
 def _rail_route(start: dict, destination: dict) -> list[dict[str, int]]:
     distance = _rail_distance(start, destination)
     steps = max(2, ceil(distance / 46))
@@ -724,39 +742,91 @@ def _rail_route(start: dict, destination: dict) -> list[dict[str, int]]:
 
 
 def _service_state(minutes_since_start: int) -> dict:
-    """Return the clock-driven Folk Loop state; it never depends on passenger demand."""
-    cycle_minute = minutes_since_start % SERVICE_CYCLE_MINUTES
+    """Return the scheduled location, including the overnight Market Square layover."""
+    minute_of_day = minutes_since_start
     market = STATIONS["market"]
     eastgate = STATIONS["eastgate"]
     rowan = STATIONS["rowan"]
+    if minute_of_day < SERVICE_START_MINUTE or minute_of_day >= LAST_CYCLE_START_MINUTE:
+        return {
+            "distance": market["distance"],
+            "at_station": market["id"],
+            "service_state": "parked",
+            "doors_open": False,
+        }
+    cycle_minute = (minute_of_day - SERVICE_START_MINUTE) % SERVICE_CYCLE_MINUTES
+    def stop_state(station: dict, dwell_minute: float) -> dict:
+        state = "stopped" if dwell_minute < 0.25 else (
+            "departing" if dwell_minute >= 2.75 else "boarding"
+        )
+        return {
+            "distance": station["distance"], "at_station": station["id"],
+            "service_state": state, "doors_open": state == "boarding",
+        }
+
     if cycle_minute < 3:
-        return {"distance": market["distance"], "at_station": market["id"]}
+        return stop_state(market, cycle_minute)
     if cycle_minute < 13:
         progress = (cycle_minute - 3) / 10
         return {
             "distance": market["distance"]
             + _rail_distance(market, eastgate) * progress,
             "at_station": None,
+            "service_state": "departing" if cycle_minute < 3.25 else (
+                "approaching" if cycle_minute >= 12.75 else "travelling"
+            ),
+            "doors_open": False,
         }
     if cycle_minute < 16:
-        return {"distance": eastgate["distance"], "at_station": eastgate["id"]}
+        return stop_state(eastgate, cycle_minute - 13)
     if cycle_minute < 28:
         progress = (cycle_minute - 16) / 12
         return {
             "distance": eastgate["distance"]
             + _rail_distance(eastgate, rowan) * progress,
             "at_station": None,
+            "service_state": "departing" if cycle_minute < 16.25 else (
+                "approaching" if cycle_minute >= 27.75 else "travelling"
+            ),
+            "doors_open": False,
         }
     if cycle_minute < 31:
-        return {"distance": rowan["distance"], "at_station": rowan["id"]}
-    progress = (cycle_minute - 31) / 12
+        return stop_state(rowan, cycle_minute - 28)
+    progress = (cycle_minute - 31) / 14
     return {
         "distance": rowan["distance"] + _rail_distance(rowan, market) * progress,
         "at_station": None,
+        "service_state": "departing" if cycle_minute < 31.25 else (
+            "approaching" if cycle_minute >= 44.75 else "travelling"
+        ),
+        "doors_open": False,
     }
 
 
-def _train_journey(start: dict, destination: dict) -> dict | None:
+def _next_service(
+    departure: dict, arrival: dict, ready_at: datetime, boarding_buffer_seconds: int = 0
+) -> tuple[datetime, datetime]:
+    """Find the first reachable departure; no ride crosses the overnight layover."""
+    travel = SERVICE_TRAVEL_MINUTES[(departure["id"], arrival["id"])]
+    for day_offset in range(3):
+        day = (ready_at + timedelta(days=day_offset)).date()
+        midnight = datetime.combine(day, datetime.min.time())
+        for cycle in range((LAST_CYCLE_START_MINUTE - SERVICE_START_MINUTE) // SERVICE_CYCLE_MINUTES):
+            departure_minute = (
+                SERVICE_START_MINUTE + cycle * SERVICE_CYCLE_MINUTES
+                + SERVICE_DEPARTURES[departure["id"]]
+            )
+            if departure_minute + travel > LAST_CYCLE_START_MINUTE:
+                continue
+            departure_at = midnight + timedelta(minutes=departure_minute)
+            if departure_at >= ready_at + timedelta(seconds=boarding_buffer_seconds):
+                return departure_at, departure_at + timedelta(minutes=travel)
+    raise ValueError("No Folk Loop service found within three days")
+
+
+def _train_journey(start: dict, destination: dict, now: datetime | None = None) -> dict | None:
+    """Choose the fastest useful complete trip, including access and timetable wait."""
+    now = now or datetime.fromisoformat("2031-05-12T07:30:00")
     walking_minutes = _walking_minutes(start, destination)
     best: dict | None = None
     for departure in STATIONS.values():
@@ -766,13 +836,12 @@ def _train_journey(start: dict, destination: dict) -> dict | None:
             access_minutes = _station_walk_minutes(start, departure)
             egress_minutes = _station_walk_minutes(arrival, destination)
             rail_minutes = SERVICE_TRAVEL_MINUTES[(departure["id"], arrival["id"])]
-            departure_minute = SERVICE_DEPARTURES[departure["id"]]
-            arrival_minute = departure_minute + rail_minutes
-            # A realistic pedestrian egress can run past the nominal shift start;
-            # the commuter remains on their route rather than being snapped to work.
-            if arrival_minute + egress_minutes > 60:
-                continue
-            total_minutes = access_minutes + rail_minutes + egress_minutes
+            departure_at, arrival_at = _next_service(
+                departure, arrival, now + timedelta(minutes=access_minutes),
+                boarding_buffer_seconds=45,
+            )
+            completed_at = arrival_at + timedelta(minutes=egress_minutes)
+            total_minutes = (completed_at - now).total_seconds() / 60
             candidate = {
                 "departure": departure,
                 "arrival": arrival,
@@ -780,8 +849,10 @@ def _train_journey(start: dict, destination: dict) -> dict | None:
                 "rail_minutes": rail_minutes,
                 "egress_minutes": egress_minutes,
                 "minutes": total_minutes,
-                "departure_minute": departure_minute,
-                "arrival_minute": arrival_minute,
+                "departure_at": departure_at.isoformat(timespec="seconds"),
+                "arrival_at": arrival_at.isoformat(timespec="seconds"),
+                "departure_minute": departure_at.hour * 60 + departure_at.minute,
+                "arrival_minute": arrival_at.hour * 60 + arrival_at.minute,
             }
             if best is None or candidate["minutes"] < best["minutes"]:
                 best = candidate
@@ -790,120 +861,247 @@ def _train_journey(start: dict, destination: dict) -> dict | None:
     return None
 
 
+def _station_queue(world: dict, station_id: str) -> dict:
+    queues = world.setdefault("station_queues", [])
+    queue = next((item for item in queues if item["station_id"] == station_id), None)
+    if queue is None:
+        queue = {"station_id": station_id, "entries": []}
+        queues.append(queue)
+    return queue
+
+
+def _remove_from_station_queues(world: dict, person_id: str) -> None:
+    for queue in world.setdefault("station_queues", []):
+        queue["entries"] = [
+            entry for entry in queue["entries"] if entry["person_id"] != person_id
+        ]
+
+
+def _enqueue_train_trip(world: dict, person: dict, trip: dict) -> None:
+    queue = _station_queue(world, trip["departure_id"])
+    if not any(entry["person_id"] == person["id"] for entry in queue["entries"]):
+        queue["entries"].append({
+            "person_id": person["id"],
+            "arrived_at_seconds": world["simulation"]["elapsed_seconds"],
+            "tie_breaker": person["id"],
+            "destination_station_id": trip["arrival_id"],
+        })
+        queue["entries"].sort(
+            key=lambda entry: (entry["arrived_at_seconds"], entry["tie_breaker"])
+        )
+    trip["phase"] = "queued"
+    person["train_departure_id"] = trip["departure_id"]
+    person["train_arrival_id"] = trip["arrival_id"]
+
+
 def _assign_train_seat(world: dict, person: dict) -> bool:
-    """Give a boarding passenger one stable seat without repacking other riders."""
+    """Assign the first empty seat without moving riders already aboard."""
     occupied = {
         (neighbour.get("train_car_index"), neighbour.get("train_seat_index"))
-        for neighbour in world["people"]
-        if neighbour.get("on_train")
+        for neighbour in world["people"] if neighbour.get("on_train")
     }
     for seat_number in range(TRAIN_CAPACITY):
-        seat = (seat_number // TRAIN_CAR_CAPACITY, seat_number % TRAIN_CAR_CAPACITY)
-        if seat not in occupied:
-            person["train_car_index"], person["train_seat_index"] = seat
+        car_index, seat_index = divmod(seat_number, TRAIN_CAR_CAPACITY)
+        if (car_index, seat_index) not in occupied:
+            person["train_id"] = "train:folk-loop"
+            person["train_car_index"] = car_index
+            person["train_seat_index"] = seat_index
+            person["train_car_id"] = f"carriage:folk-loop-{car_index + 1}"
+            person["train_seat_id"] = f"seat:{car_index + 1}:{seat_index + 1}"
             person["on_train"] = True
             return True
     return False
 
 
-def _take_train_to(
-    world: dict,
-    person: dict,
-    start: dict,
-    destination: dict,
-    journey: dict,
-    minutes_since_start: int,
-    next_commitment: str,
-) -> None:
-    departure = journey["departure"]
-    arrival = journey["arrival"]
-    access_minutes = journey["access_minutes"]
-    departure_minute = journey["departure_minute"]
-    arrival_minute = journey["arrival_minute"]
-    journey_start = departure_minute - access_minutes
-    if minutes_since_start < departure_minute:
-        if minutes_since_start >= journey_start and minutes_since_start < 0:
-            _walk_station_to(
-                person,
-                start,
-                departure,
-                (minutes_since_start - journey_start) / access_minutes,
-                next_commitment,
-                f"Walking to {departure['name']}",
-                "The train makes this cross-town journey much faster than walking the whole way.",
-            )
-            return
-        _move_to(
-            person,
-            departure,
-            f"Queued for Folk Loop at {departure['name']}",
-            "The scheduled Folk Loop service will board passengers when it reaches this platform.",
-            next_commitment,
+def _alight(world: dict, person: dict, station: dict) -> None:
+    trip = person.get("train_trip")
+    person["position"] = _position_at(person, station)
+    person["target_place_id"] = station["id"]
+    person.pop("route", None)
+    for key in (
+        "on_train", "train_id", "train_car_index", "train_seat_index",
+        "train_car_id", "train_seat_id", "train_departure_id", "train_arrival_id",
+    ):
+        person.pop(key, None)
+    if trip is None:
+        return
+    if trip["arrival_id"] == station["id"]:
+        trip["phase"] = "egress"
+    else:
+        # Every passenger leaves the train before its nightly layover.
+        trip["departure_id"] = station["id"]
+        _enqueue_train_trip(world, person, trip)
+
+
+def _process_train_stop(world: dict, now: datetime, state: dict) -> None:
+    station_id = state["at_station"]
+    if station_id is None:
+        return
+    station = next(item for item in STATIONS.values() if item["id"] == station_id)
+    for person in world["people"]:
+        if person.get("on_train") and (state["doors_open"] or state["service_state"] == "parked") and (
+            person.get("train_arrival_id") == station_id
+            or state["service_state"] == "parked"
+        ):
+            _alight(world, person, station)
+    if not state["doors_open"]:
+        return
+    minute_of_day = now.hour * 60 + now.minute + now.second / 60
+    cycle_minute = (minute_of_day - SERVICE_START_MINUTE) % SERVICE_CYCLE_MINUTES
+    stop_start = {"station:market": 0, "station:eastgate": 13, "station:rowan": 28}[station_id]
+    slot = int((cycle_minute - stop_start) * 60 // BOARDING_SECONDS_PER_PERSON)
+    if slot < 1 or slot >= 3 * 60 // BOARDING_SECONDS_PER_PERSON:
+        return
+    slot_key = f"{now.date()}:{int((minute_of_day - SERVICE_START_MINUTE) // SERVICE_CYCLE_MINUTES)}:{station_id}:{slot}"
+    train = world["trains"][0]
+    if train.get("last_boarding_slot") == slot_key:
+        return
+    train["last_boarding_slot"] = slot_key
+    queue = _station_queue(world, station_id)
+    departure_at = now + timedelta(
+        seconds=(3 * 60 - (cycle_minute - stop_start) * 60)
+    )
+    for entry in list(queue["entries"]):
+        person = next((item for item in world["people"] if item["id"] == entry["person_id"]), None)
+        if person is None or person.get("train_trip", {}).get("phase") != "queued":
+            queue["entries"].remove(entry)
+            continue
+        arrival = next(item for item in STATIONS.values() if item["id"] == entry["destination_station_id"])
+        arrival_at = departure_at + timedelta(
+            minutes=SERVICE_TRAVEL_MINUTES[(station_id, arrival["id"])]
         )
-        person["train_departure_id"] = departure["id"]
+        service_end = datetime.combine(now.date(), datetime.min.time()) + timedelta(days=1)
+        if arrival_at > service_end:
+            continue
+        if not _assign_train_seat(world, person):
+            break
+        queue["entries"].remove(entry)
+        trip = person["train_trip"]
+        trip["phase"] = "aboard"
+        trip["boarded_departure_at"] = departure_at.isoformat(timespec="seconds")
+        person["train_departure_id"] = station_id
         person["train_arrival_id"] = arrival["id"]
-    elif minutes_since_start < arrival_minute:
-        if minutes_since_start == departure_minute and not person.get("on_train"):
-            _assign_train_seat(world, person)
-        if not person.get("on_train"):
-            _move_to(
-                person,
-                departure,
-                f"Queued for next Folk Loop at {departure['name']}",
-                "All available seats were taken; this passenger remains safely on the platform.",
-                next_commitment,
-            )
-            person["train_departure_id"] = departure["id"]
-            person["train_arrival_id"] = arrival["id"]
+        person.pop("route", None)
+        break
+
+
+def _run_train_trip(world: dict, person: dict, now: datetime, state: dict) -> None:
+    trip = person["train_trip"]
+    departure = next(item for item in STATIONS.values() if item["id"] == trip["departure_id"])
+    arrival = next(item for item in STATIONS.values() if item["id"] == trip["arrival_id"])
+    destination = _place(world, trip["destination_id"])
+    next_commitment = f"{person['role']} shift at {person.get('shift_start_minute', 480) // 60:02d}:00"
+    if trip["phase"] == "access":
+        if not _at_place(person, departure) and not _walk_from_current_position(
+            world, person, departure, next_commitment,
+            f"Walking to {departure['name']}",
+            "Folk Loop is useful for this trip; the platform must be reached before boarding.",
+            local=True,
+        ):
             return
-        route = _rail_route(departure, arrival)
-        person["position"] = position_on_route(
-            route, (minutes_since_start - departure_minute) / journey["rail_minutes"]
+        _enqueue_train_trip(world, person, trip)
+    if trip["phase"] == "queued":
+        _enqueue_train_trip(world, person, trip)
+        next_departure, next_arrival = _next_service(
+            departure, arrival, now, boarding_buffer_seconds=45
         )
-        person["target_place_id"] = arrival["id"]
-        person["activity"] = f"Riding Folk Loop to {arrival['name']}"
+        queue = _station_queue(world, departure["id"])["entries"]
+        rank = next(index for index, entry in enumerate(queue) if entry["person_id"] == person["id"])
+        free_seats = TRAIN_CAPACITY - sum(bool(neighbour.get("on_train")) for neighbour in world["people"])
+        if state["at_station"] == departure["id"] and rank >= free_seats:
+            next_departure, next_arrival = _next_service(
+                departure, arrival, next_departure + timedelta(seconds=1)
+            )
+        if (
+            state["service_state"] == "parked"
+            and (next_departure - now).total_seconds() > 90 * 60
+        ):
+            _remove_from_station_queues(world, person["id"])
+            person.pop("train_trip", None)
+            person.pop("train_departure_id", None)
+            person.pop("train_arrival_id", None)
+            home = _place(world, person["home_place_id"])
+            _walk_from_current_position(
+                world, person, home, "Plan tomorrow's trip", "Walking home",
+                "Folk Loop is parked from midnight to 06:00, so this resident is heading home and will plan again in the morning.",
+            )
+            return
+        eta = next_arrival + timedelta(minutes=_station_walk_minutes(arrival, destination))
+        shift_minute = person.get("shift_start_minute", 8 * 60)
+        shift_deadline = datetime.combine(
+            eta.date(), datetime.min.time()
+        ) + timedelta(minutes=shift_minute)
+        lateness = (
+            f" Expected work arrival {eta:%H:%M}, about {ceil((eta - shift_deadline).total_seconds() / 60)} minutes late."
+            if eta > shift_deadline else f" Earliest work arrival {eta:%H:%M}."
+        )
+        person["position"] = _position_at(person, departure)
+        person["target_place_id"] = departure["id"]
+        person["activity"] = f"Queued for Folk Loop at {departure['name']}"
         person["explanation"] = (
-            "The scheduled train is covering the long cross-town section while walking would take much longer."
+            f"Folk Loop is parked overnight until 06:00. The next usable departure is "
+            f"{next_departure:%H:%M}." + lateness
+            if state["service_state"] == "parked"
+            else f"This resident reached the platform and is waiting in arrival order for the {next_departure:%H:%M} service." + lateness
         )
         person["next_commitment"] = next_commitment
+        person.pop("route", None)
+        return
+    if trip["phase"] == "aboard":
+        person["position"] = _rail_position(state["distance"])
+        person["target_place_id"] = arrival["id"]
+        person["activity"] = f"Riding Folk Loop to {arrival['name']}"
+        person["explanation"] = "This resident boarded at a station and keeps the same seat until their stop."
+        person["next_commitment"] = next_commitment
+        route = _rail_route(departure, arrival)
         person["route"] = route
+        departure_at = datetime.fromisoformat(trip["boarded_departure_at"])
+        ride_seconds = SERVICE_TRAVEL_MINUTES[(departure["id"], arrival["id"])] * 60
+        progress = min(1, max(0, (now - departure_at).total_seconds() / ride_seconds))
         person["journey"] = {
-            "id": f"journey:{person['id']}:{departure['id']}:{arrival['id']}",
-            "status": "active",
-            "active_leg_index": 0,
-            "legs": [
-                {
-                    "id": f"leg:{departure['id']}:{arrival['id']}",
-                    "mode": "train",
-                    "start_location": {"kind": "platform", "station_id": departure["id"]},
-                    "end_location": {"kind": "platform", "station_id": arrival["id"]},
-                    "edge_ids": ["rail:folk-loop"],
-                    "distance": _rail_distance(departure, arrival),
-                    "progress": min(
-                        1,
-                        max(0, (minutes_since_start - departure_minute) / journey["rail_minutes"]),
-                    ),
-                }
-            ],
+            "id": f"journey:{person['id']}:{trip['boarded_departure_at']}",
+            "status": "active", "active_leg_index": 0,
+            "legs": [{
+                "id": f"leg:{departure['id']}:{arrival['id']}", "mode": "train",
+                "start_location": {"kind": "platform", "station_id": departure["id"]},
+                "end_location": {"kind": "platform", "station_id": arrival["id"]},
+                "edge_ids": ["rail:folk-loop"],
+                "distance": _rail_distance(departure, arrival), "progress": progress,
+            }],
         }
-        person["train_departure_id"] = departure["id"]
-        person["train_arrival_id"] = arrival["id"]
-    else:
-        person.pop("on_train", None)
-        person.pop("train_car_index", None)
-        person.pop("train_seat_index", None)
-        person.pop("train_departure_id", None)
-        person.pop("train_arrival_id", None)
-        _walk_station_to(
-            person,
-            arrival,
-            destination,
-            (minutes_since_start - arrival_minute) / journey["egress_minutes"],
-            next_commitment,
-            f"Walking from {arrival['name']} to {destination['name']}",
-            "The train handled the long leg; this is the short final walk.",
-        )
+        return
+    if _walk_from_current_position(
+        world, person, destination, next_commitment,
+        f"Walking from {arrival['name']} to {destination['name']}",
+        "The train handled the long leg; this is the final local walk.",
+        local=True,
+    ):
+        person.pop("train_trip", None)
 
+
+def _restore_legacy_train_trip(person: dict) -> None:
+    if person.get("train_trip"):
+        return
+    departure_id = person.get("train_departure_id")
+    arrival_id = person.get("train_arrival_id")
+    if departure_id not in {item["id"] for item in STATIONS.values()} or arrival_id not in {item["id"] for item in STATIONS.values()}:
+        for key in (
+            "on_train", "train_id", "train_car_index", "train_seat_index",
+            "train_car_id", "train_seat_id", "train_departure_id", "train_arrival_id",
+        ):
+            person.pop(key, None)
+        return
+    if person.get("on_train"):
+        car_index = person.get("train_car_index", 0)
+        seat_index = person.get("train_seat_index", 0)
+        person["train_id"] = "train:folk-loop"
+        person["train_car_id"] = f"carriage:folk-loop-{car_index + 1}"
+        person["train_seat_id"] = f"seat:{car_index + 1}:{seat_index + 1}"
+    person["train_trip"] = {
+        "departure_id": departure_id, "arrival_id": arrival_id,
+        "destination_id": person["workplace_id"],
+        "phase": "aboard" if person.get("on_train") else "access",
+    }
 
 def _advance_needs(person: dict, seconds: int) -> None:
     accumulated = person.setdefault("need_elapsed_seconds", {})
@@ -933,6 +1131,7 @@ def advance_seconds(world: dict, seconds: int) -> dict:
 
 
 def _advance_step(world: dict, seconds: int) -> dict:
+    ensure_economy(world)
     previous = datetime.fromisoformat(world["clock"])
     now = previous + timedelta(seconds=seconds)
     world["clock"] = now.isoformat(timespec="seconds")
@@ -943,10 +1142,27 @@ def _advance_step(world: dict, seconds: int) -> dict:
     simulation["elapsed_seconds"] += seconds
     simulation["presentation_time_seconds"] = simulation["elapsed_seconds"]
     current_minutes = now.hour * 60 + now.minute
-    minutes_since_service_start = (
-        now.hour * 60 + now.minute + now.second / 60 - (7 * 60 + 30)
-    )
+    minute_of_day = now.hour * 60 + now.minute + now.second / 60
+    train_state = _service_state(minute_of_day)
+    world["trains"][0].setdefault("track", rail_track())
+    world["trains"][0].setdefault("stations", [
+        {key: value for key, value in station.items() if key != "distance"}
+        for station in STATIONS.values()
+    ])
+    for person in world["people"]:
+        _restore_legacy_train_trip(person)
+        if person.get("train_trip", {}).get("phase") == "aboard":
+            person["train_trip"].setdefault(
+                "boarded_departure_at", now.isoformat(timespec="seconds")
+            )
+    _process_train_stop(world, now, train_state)
     _consume_daily_food(world, now)
+    if seconds and now.date() != previous.date():
+        reset_daily_sales(world, now)
+        charge_daily_overhead(world, now)
+        pay_owner_dividends(world, now)
+    if seconds and now.hour == 9 and now.minute == 0 and now.second == 0:
+        consider_takeovers(world, now)
     pippin = world["pets"][0]
     _ensure_pet_walk_contract(world, pippin, now)
     _update_pet_walk_need(pippin, now)
@@ -960,47 +1176,55 @@ def _advance_step(world: dict, seconds: int) -> dict:
         household = _household(world, person)
         shift_start = person.get("shift_start_minute", 8 * 60)
         shift_end = person.get("shift_end_minute", 17 * 60)
-        train_journey = _train_journey(home, work) if shift_start == 8 * 60 else None
+        unemployed = work.get("business", {}).get("status") == "bankrupt"
+        person["employment_status"] = "out of work" if unemployed else "employed"
+        if unemployed:
+            shift_start = shift_end = 0
         commute_minutes = _walking_minutes(home, work)
         commute_start = shift_start - commute_minutes
-        if train_journey:
-            commute_start = (
-                7 * 60
-                + 30
-                + train_journey["departure_minute"]
-                - train_journey["access_minutes"]
-            )
-        if _care_for_pet(world, person, pippin, now):
+        if not person.get("train_trip") and _care_for_pet(world, person, pippin, now):
             continue
-        train_window_ends = (
-            train_journey["arrival_minute"] + train_journey["egress_minutes"]
-            if train_journey
-            else None
-        )
-        if (
-            train_journey
-            and commute_start <= current_minutes
-            and minutes_since_service_start < train_window_ends
-        ):
-            _take_train_to(
-                world,
-                person,
-                home,
-                work,
-                train_journey,
-                minutes_since_service_start,
-                f"{person['role']} shift at {shift_start // 60:02d}:{shift_start % 60:02d}",
-            )
-        elif commute_start <= current_minutes < shift_start:
-            elapsed_minutes = current_minutes - commute_start
-            _walk_to(
-                    person,
-                    home,
-                    work,
-                    elapsed_minutes / commute_minutes,
+        if person.get("train_trip"):
+            _run_train_trip(world, person, now, train_state)
+            continue
+        if _is_bedtime(current_minutes) and not shift_start <= current_minutes < shift_end:
+            if _at_place(person, home):
+                _sleep_at_home(person, home, now)
+            else:
+                _walk_from_current_position(
+                    world, person, home, "Sleep at home", "Walking home to sleep",
+                    "It is bedtime, so this resident is heading home to sleep.",
+                )
+            continue
+        if commute_start <= current_minutes < shift_end and not _at_place(person, work) and shift_start == 8 * 60:
+            journey = _train_journey({"position": person["position"]}, work, now)
+            if journey:
+                person.pop("direct_walk", None)
+                person["train_trip"] = {
+                    "departure_id": journey["departure"]["id"],
+                    "arrival_id": journey["arrival"]["id"],
+                    "destination_id": work["id"],
+                    "phase": "access",
+                }
+                _run_train_trip(world, person, now, train_state)
+                continue
+        if commute_start <= current_minutes < shift_start:
+            if not _at_place(person, work):
+                _walk_from_current_position(
+                    world, person, work,
                     f"{person['role']} shift at {shift_start // 60:02d}:{shift_start % 60:02d}",
-            )
+                    f"Walking to {work['name']}",
+                    "The shift is approaching, so this resident is following the route to work.",
+                )
         elif shift_start <= current_minutes < shift_end:
+            if not _at_place(person, work):
+                _walk_from_current_position(
+                    world, person, work,
+                    f"{person['role']} shift at {shift_start // 60:02d}:{shift_start % 60:02d}",
+                    f"Walking to {work['name']}",
+                    "The shift has started, but work begins only after this resident arrives.",
+                )
+                continue
             _increase_quiet_shift_boredom(world, person, work, now)
             if (
                 _is_meal_time(current_minutes)
@@ -1020,23 +1244,20 @@ def _advance_step(world: dict, seconds: int) -> dict:
                 f"It is a scheduled {person['role'].lower()} shift, so this commitment takes priority.",
                 next_commitment,
             )
+            if seconds:
+                pay_work_seconds(world, person, seconds, now)
         else:
-            work_to_market_minutes = _walking_minutes(work, market)
-            market_to_home_minutes = _walking_minutes(market, home)
-            work_to_home_minutes = _walking_minutes(work, home)
-            work_to_bar_minutes = _walking_minutes(work, bar)
-            bar_to_home_minutes = _walking_minutes(bar, home)
-            work_to_cinema_minutes = _walking_minutes(work, cinema)
-            cinema_to_home_minutes = _walking_minutes(cinema, home)
-            after_work_minutes = current_minutes - shift_end
-            if after_work_minutes < 0:
-                if person["needs"].get("rest", 0) >= SLEEP_REST_THRESHOLD:
+            if current_minutes < commute_start:
+                if not _at_place(person, home):
+                    _walk_from_current_position(
+                        world, person, home, "Rest at home", "Walking home",
+                        "There is no shift underway, so this resident is returning home.",
+                    )
+                elif person["needs"].get("rest", 0) >= SLEEP_REST_THRESHOLD:
                     _sleep_at_home(person, home, now)
                 else:
                     _move_to(
-                        person,
-                        home,
-                        "At home",
+                        person, home, "At home",
                         "There is no urgent commitment before work, so the household is staying home.",
                         f"{person['role']} shift at {shift_start // 60:02d}:{shift_start % 60:02d}",
                     )
@@ -1052,21 +1273,20 @@ def _advance_step(world: dict, seconds: int) -> dict:
                 and household.get("grocery_assigned_date") == now.date().isoformat()
             )
             market_available = _is_business_open_and_staffed(world, market, current_minutes)
-            grocery_browsing_minutes = _grocery_browsing_minutes(household)
             social_visit_today = person.get("social_visit_date") == now.date().isoformat()
             needs_social_outing = person["needs"].get("social", 0) >= SOCIAL_NEED_THRESHOLD
-            wants_to_socialize = social_visit_today or needs_social_outing or (
+            wants_to_socialize = needs_social_outing or (
                 person["needs"].get("boredom", 0) * person.get("social_inclination", 0.5)
                 >= SOCIAL_BOREDOM_THRESHOLD
             )
             cinema_visit_today = person.get("cinema_visit_date") == now.date().isoformat()
             cinema_score = person["needs"].get("boredom", 0) * person.get("cinema_inclination", 0.4)
             social_score = person["needs"].get("boredom", 0) * person.get("social_inclination", 0.5)
-            wants_cinema = cinema_visit_today or (
+            wants_cinema = (
                 person["needs"].get("boredom", 0) >= ENTERTAINMENT_BOREDOM_THRESHOLD
                 and cinema_score >= CINEMA_BOREDOM_THRESHOLD
             )
-            chooses_cinema = cinema_visit_today or (
+            chooses_cinema = (
                 wants_cinema and not needs_social_outing and cinema_score > social_score
             )
             needs_sleep = person["needs"].get("rest", 0) >= SLEEP_REST_THRESHOLD
@@ -1077,206 +1297,110 @@ def _advance_step(world: dict, seconds: int) -> dict:
                     and person["needs"].get("hunger", 0) >= MEAL_WINDOW_HUNGER_THRESHOLD
                 )
             )
-            if needs_meal and household["food_servings"] > 0 and _is_near_place(person, home):
-                _eat_at_home(person, home, now)
-            elif needs_meal and household["food_servings"] > 0:
-                _walk_from_current_position(
-                    world,
-                    person,
-                    home,
-                    "Eat at home",
-                    "Walking home to eat",
-                    "There is food at home, so hunger takes priority over an optional outing.",
-                )
-            elif needs_sleep and after_work_minutes < work_to_home_minutes:
-                _walk_to(
-                    person,
-                    work,
-                    home,
-                    after_work_minutes / work_to_home_minutes,
-                    "Sleep at home",
-                    "Walking home to rest",
-                    "They are tired enough that rest takes priority over the evening's other plans.",
-                )
-            elif needs_sleep:
-                if _is_near_place(person, home):
-                    _sleep_at_home(person, home, now)
-                else:
+            plan = person.get("evening_plan")
+            if plan and plan["date"] != now.date().isoformat():
+                person.pop("evening_plan")
+                plan = None
+            if needs_meal and household["food_servings"] > 0 or needs_sleep:
+                person.pop("evening_plan", None)
+                if not _at_place(person, home):
                     _walk_from_current_position(
-                        world,
-                        person,
-                        home,
-                        "Sleep at home",
-                        "Walking home to rest",
-                        "They are tired enough that rest takes priority over the evening's other plans.",
-                    )
-            elif is_grocery_shopper and market_available and after_work_minutes < work_to_market_minutes:
-                if _is_near_place(person, work):
-                    _walk_to(
-                        person,
-                        work,
-                        market,
-                        after_work_minutes / work_to_market_minutes,
-                        "Buy groceries at Hearth Market",
-                        "Walking to Hearth Market",
-                        "Food at home is running low, so groceries take priority before going home.",
-                    )
-                else:
-                    _walk_from_current_position(
-                        world,
-                        person,
-                        market,
-                        "Buy groceries at Hearth Market",
-                        "Walking to Hearth Market",
-                        "Food at home is running low, so this shopper is walking there from their current position.",
-                    )
-            elif is_grocery_shopper and market_available and after_work_minutes < (
-                work_to_market_minutes + grocery_browsing_minutes
-            ):
-                if _is_near_place(person, market) or (
-                    person.get("target_place_id") == market["id"]
-                    and person.get("activity", "").startswith("Shopping")
-                ):
-                    _shop_for_groceries(person, household, market, current_minutes, now)
-                else:
-                    _walk_from_current_position(
-                        world,
-                        person,
-                        market,
-                        "Buy groceries at Hearth Market",
-                        "Walking to Hearth Market",
-                        "The market is open and staffed, but this shopper has not arrived yet.",
-                    )
-            elif is_grocery_shopper and market_available and after_work_minutes < (
-                work_to_market_minutes
-                + grocery_browsing_minutes
-                + market_to_home_minutes
-            ):
-                _walk_to(
-                    person,
-                    market,
-                    home,
-                    (after_work_minutes - work_to_market_minutes - grocery_browsing_minutes)
-                    / market_to_home_minutes,
-                    "Make dinner at home",
-                    "Walking home with groceries",
-                    "The pantry has been restocked; the next stop is home for dinner.",
-                )
-            elif chooses_cinema and after_work_minutes < work_to_cinema_minutes:
-                _walk_to(
-                    person,
-                    work,
-                    cinema,
-                    after_work_minutes / work_to_cinema_minutes,
-                    "Watch a film at Clover Cinema",
-                    "Walking to Clover Cinema",
-                    "A film suits this resident's cinema inclination after a tiring day.",
-                )
-            elif chooses_cinema and after_work_minutes < work_to_cinema_minutes + CINEMA_VISIT_MINUTES:
-                if _is_near_place(person, cinema):
-                    _watch_film(person, cinema, current_minutes, now)
-                else:
-                    _walk_from_current_position(
-                        world,
-                        person,
-                        cinema,
-                        "Watch a film at Clover Cinema",
-                        "Walking to Clover Cinema",
-                        "This resident wants entertainment, so they are walking to the cinema first.",
-                    )
-            elif chooses_cinema and after_work_minutes < (
-                work_to_cinema_minutes + CINEMA_VISIT_MINUTES + cinema_to_home_minutes
-            ):
-                _walk_to(
-                    person,
-                    cinema,
-                    home,
-                    (after_work_minutes - work_to_cinema_minutes - CINEMA_VISIT_MINUTES)
-                    / cinema_to_home_minutes,
-                    "Make dinner at home",
-                    "Walking home after the film",
-                    "The film is over, and this resident is heading home.",
-                )
-            elif wants_to_socialize and after_work_minutes < work_to_bar_minutes:
-                if _is_near_place(person, work):
-                    _walk_to(
-                        person,
-                        work,
-                        bar,
-                        after_work_minutes / work_to_bar_minutes,
-                        "Meet neighbours at The Lantern Bar",
-                        "Walking to The Lantern Bar",
-                        "A quiet shift was boring, and social time sounds more appealing than going straight home.",
-                    )
-                else:
-                    _walk_from_current_position(
-                        world,
-                        person,
-                        bar,
-                        "Meet neighbours at The Lantern Bar",
-                        "Walking to The Lantern Bar",
-                        "Social time sounds appealing, but this resident still has to walk there.",
-                    )
-            elif wants_to_socialize and after_work_minutes < (
-                work_to_bar_minutes + SOCIALIZING_MINUTES
-            ):
-                if _is_near_place(person, bar):
-                    _socialize_at_bar(person, bar, current_minutes, now)
-                else:
-                    _walk_from_current_position(
-                        world,
-                        person,
-                        bar,
-                        "Meet neighbours at The Lantern Bar",
-                        "Walking to The Lantern Bar",
-                        "Social time sounds appealing, but this resident still has to walk there.",
-                    )
-            elif wants_to_socialize and after_work_minutes < (
-                work_to_bar_minutes + SOCIALIZING_MINUTES + bar_to_home_minutes
-            ):
-                _walk_to(
-                    person,
-                    bar,
-                    home,
-                    (after_work_minutes - work_to_bar_minutes - SOCIALIZING_MINUTES)
-                    / bar_to_home_minutes,
-                    "Make dinner at home",
-                    "Walking home after socializing",
-                    "The bar visit is over; this resident feels less restless and is heading home.",
-                )
-            elif not is_grocery_shopper and after_work_minutes < work_to_home_minutes:
-                _walk_to(
-                    person,
-                    work,
-                    home,
-                    after_work_minutes / work_to_home_minutes,
-                    "Make dinner at home",
-                    "Walking home after work",
-                    "There is enough food at home for several days, so there is no need to shop today.",
-                )
-            else:
-                person.pop("carrying_groceries", None)
-                if not _is_near_place(person, home):
-                    _walk_from_current_position(
-                        world,
-                        person,
-                        home,
-                        "Return home",
-                        "Walking home",
-                        "The evening activity is over, so this resident is walking home rather than appearing there.",
+                        world, person, home, "Eat or rest at home", "Walking home",
+                        "Food or rest takes priority, and this resident must reach home first.",
                     )
                 elif needs_meal and household["food_servings"] > 0:
                     _eat_at_home(person, home, now)
-                elif needs_meal and household["food_servings"] <= 0 and not market_available:
+                else:
+                    _sleep_at_home(person, home, now)
+                continue
+            if plan is None:
+                kind = None
+                if (is_grocery_shopper and market_available
+                    and can_pay(world, household["id"], household.get("grocery_servings_to_buy", 0) * price_cents(market))
+                    and household.get("grocery_trip_date") != now.date().isoformat()):
+                    kind = "grocery"
+                elif (chooses_cinema and not cinema_visit_today and can_pay(world, person["id"], price_cents(cinema))
+                      and _is_business_open_and_staffed(world, cinema, current_minutes)):
+                    kind = "cinema"
+                elif (wants_to_socialize and not social_visit_today and can_pay(world, person["id"], price_cents(bar))
+                      and _is_business_open_and_staffed(world, bar, current_minutes)):
+                    kind = "bar"
+                if kind:
+                    plan = {"date": now.date().isoformat(), "kind": kind, "phase": "travel"}
+                    person["evening_plan"] = plan
+            if plan:
+                destination = {"grocery": market, "cinema": cinema, "bar": bar}[plan["kind"]]
+                if plan["phase"] == "travel":
+                    if not _at_place(person, destination):
+                        _walk_from_current_position(
+                            world, person, destination, f"Visit {destination['name']}",
+                            f"Walking to {destination['name']}",
+                            "This resident is following the saved route from their current position.",
+                        )
+                        continue
+                    plan["phase"] = "activity"
+                    plan["started_at_seconds"] = simulation["elapsed_seconds"]
+                    payer = household["id"] if plan["kind"] == "grocery" else person["id"]
+                    units = household.get("grocery_servings_to_buy", 0) if plan["kind"] == "grocery" else 1
+                    if not purchase(world, payer, destination, units, plan["kind"], now):
+                        plan["phase"] = "return"
+                if plan["phase"] == "activity":
+                    duration = {
+                        "grocery": _grocery_browsing_minutes(household),
+                        "cinema": CINEMA_VISIT_MINUTES,
+                        "bar": SOCIALIZING_MINUTES,
+                    }[plan["kind"]] * 60
+                    if simulation["elapsed_seconds"] - plan["started_at_seconds"] < duration:
+                        if plan["kind"] == "grocery":
+                            _shop_for_groceries(person, household, market, current_minutes, now)
+                        elif plan["kind"] == "cinema":
+                            _watch_film(person, cinema, current_minutes, now)
+                        else:
+                            _socialize_at_bar(person, bar, current_minutes, now)
+                        continue
+                    plan["phase"] = "return"
+            if not _at_place(person, home):
+                _walk_from_current_position(
+                    world, person, home, "Return home", "Walking home",
+                    "The evening activity is over, so this resident is walking home.",
+                )
+            else:
+                person.pop("evening_plan", None)
+                person.pop("carrying_groceries", None)
+                if needs_meal and household["food_servings"] <= 0 and not market_available:
                     _wait_for_market(person, home, now)
                 else:
                     _enjoy_home_activity(person, home, household, now)
+                    if unemployed:
+                        person["activity"] = "Looking for work"
+                        person["explanation"] = f"{work['name']} closed, so this resident has no paid shift and is considering what to do next."
+                        person["next_commitment"] = "Find work or reopen the business"
 
-    train_state = _service_state(minutes_since_service_start)
+    if seconds and now.minute == 0 and now.second == 0:
+        record_regional_sales(world, now, _is_business_open_and_staffed)
+
     world["trains"][0]["state"] = {
         **train_state,
         "capacity": TRAIN_CAPACITY,
         "car_capacity": TRAIN_CAR_CAPACITY,
+        "service_hours": {"starts_at": "06:00", "ends_at": "00:00"},
+        "stations": [
+            {
+                "station_id": station["id"],
+                "name": station["name"],
+                "queue_length": len(_station_queue(world, station["id"])["entries"]),
+                "next_arrival_at": (departure_at - timedelta(minutes=3)).isoformat(timespec="seconds"),
+                "next_departure_at": departure_at.isoformat(timespec="seconds"),
+            }
+            for station in STATIONS.values()
+            for departure_at, _ in [
+                _next_service(
+                    station,
+                    STATIONS[NEXT_STATION[station["id"]]],
+                    now,
+                )
+            ]
+        ],
         "passenger_ids": [
             person["id"] for person in world["people"] if person.get("on_train")
         ],
@@ -1287,6 +1411,21 @@ def _advance_step(world: dict, seconds: int) -> dict:
                     person["id"]
                     for person in world["people"]
                     if person.get("on_train") and person.get("train_car_index") == car_index
+                ],
+                "seats": [
+                    {
+                        "id": f"seat:{car_index + 1}:{seat_index + 1}",
+                        "passenger_id": next(
+                            (
+                                person["id"] for person in world["people"]
+                                if person.get("on_train")
+                                and person.get("train_car_index") == car_index
+                                and person.get("train_seat_index") == seat_index
+                            ),
+                            None,
+                        ),
+                    }
+                    for seat_index in range(TRAIN_CAR_CAPACITY)
                 ],
             }
             for car_index in range(TRAIN_CAPACITY // TRAIN_CAR_CAPACITY)

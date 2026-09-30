@@ -13,7 +13,10 @@ from services.worlds import (
     list_worlds,
     load_world,
     render_state,
+    set_business_price,
+    set_household_contribution,
     set_world_running,
+    take_over_world_business,
 )
 
 router = APIRouter(prefix="/worlds")
@@ -32,6 +35,18 @@ class RunWorldInput(BaseModel):
     running: bool
     speed: float = Field(default=1.0, ge=0.25, le=4.0)
     expected_revision: int | None = Field(default=None, ge=0)
+
+
+class HouseholdContributionInput(BaseModel):
+    percent: int = Field(ge=0, le=100)
+
+
+class BusinessPriceInput(BaseModel):
+    price_percent: int = Field(ge=70, le=130, multiple_of=10)
+
+
+class BusinessTakeoverInput(BusinessPriceInput):
+    buyer_id: str
 
 
 @router.get("")
@@ -70,6 +85,35 @@ def set_running(
             payload.expected_revision,
         )
     except WorldRevisionConflictError as error:
+        raise HTTPException(status_code=409, detail=str(error)) from error
+
+
+@router.put("/{world_id}/economy/household-contribution")
+def set_contribution(
+    world_id: str, payload: HouseholdContributionInput, session: Session = Depends(get_session)
+) -> dict[str, Any]:
+    return set_household_contribution(session, world_id, payload.percent)
+
+
+@router.post("/{world_id}/businesses/{place_id}/takeover")
+def take_over(
+    world_id: str, place_id: str, payload: BusinessTakeoverInput,
+    session: Session = Depends(get_session),
+) -> dict[str, Any]:
+    try:
+        return take_over_world_business(session, world_id, place_id, payload.buyer_id, payload.price_percent)
+    except ValueError as error:
+        raise HTTPException(status_code=409, detail=str(error)) from error
+
+
+@router.put("/{world_id}/businesses/{place_id}/price")
+def set_price(
+    world_id: str, place_id: str, payload: BusinessPriceInput,
+    session: Session = Depends(get_session),
+) -> dict[str, Any]:
+    try:
+        return set_business_price(session, world_id, place_id, payload.price_percent)
+    except ValueError as error:
         raise HTTPException(status_code=409, detail=str(error)) from error
 
 

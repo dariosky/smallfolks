@@ -1,5 +1,5 @@
 [project]
-name = "smallfolk"
+name = "smallfolks"
 version = "0.1.0"
 description = "A calm, inspectable city-life simulation."
 requires-python = ">=3.13"

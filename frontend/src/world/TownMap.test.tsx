@@ -39,6 +39,43 @@ const world: World = {
 };
 
 describe("TownMap resident illustrations", () => {
+  it("uses the server rail path and shows a waiting station queue", () => {
+    const markup = renderToStaticMarkup(
+      <TownMap
+        world={{
+          ...world,
+          people: [],
+          station_queues: [{ station_id: "station:market", entries: [
+            { person_id: "person:one", arrived_at_seconds: 0, destination_station_id: "station:eastgate" },
+            { person_id: "person:two", arrived_at_seconds: 15, destination_station_id: "station:eastgate" },
+          ] }],
+          trains: [{
+            id: "train:folk-loop",
+            name: "Folk Loop",
+            stops: ["Market Square", "Eastgate"],
+            track: [
+              { distance: 0, x: 450, y: 58 },
+              { distance: 100, x: 550, y: 58 },
+              { distance: 200, x: 450, y: 58 },
+            ],
+            stations: [{ id: "station:market", name: "Market Square", position: { x: 510, y: 58 }, platform: { x: -120, y: -9, width: 160, height: 18 } }],
+            state: {
+              distance: 60, at_station: "station:market", service_state: "boarding",
+              doors_open: true, service_hours: { starts_at: "06:00", ends_at: "00:00" },
+              capacity: 8, car_capacity: 4, passenger_ids: [], stations: [],
+              carriages: [],
+            },
+          }],
+        }}
+        selectedId={null}
+        onSelect={() => {}}
+      />,
+    );
+    expect(markup).toContain('points="450,58 550,58 450,58"');
+    expect(markup).toContain("2 waiting");
+    expect(markup).toContain("train-open-door");
+  });
+
   it("renders activity cues and separates residents sharing a position", () => {
     const markup = renderToStaticMarkup(
       <TownMap world={world} selectedId={null} onSelect={() => {}} />,
@@ -47,6 +84,8 @@ describe("TownMap resident illustrations", () => {
     expect(markup).toContain("Sleeping");
     expect(markup).toContain("prop-book");
     expect(markup).toContain("sleep-bed");
+    expect(markup).toContain("sleep-zzz");
+    expect((markup.match(/class="sleep-z"/g) ?? []).length).toBe(3);
     expect(markup).toContain("translate(107px, 195px)");
     expect(markup).toContain("translate(133px, 205px)");
   });

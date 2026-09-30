@@ -25,7 +25,7 @@ Preserve the user's current direction: strict top-down, detailed cartoon art, bu
 | Inspection | Live people/pet/household card, clickable household members, activity/need explanations | Good starting point; places/vehicles/train need real details |
 | Persistence | Whole-world JSON snapshot in a relational table | Saves state; no durable event history/checkpoints or world migration policy |
 | Generation | Seed recorded; fixed coordinates and population | Not procedural yet |
-| Economy/social life | No functioning accounts, transactions, relationships or memories | Missing |
+| Economy/social life | Saved personal/household/business balances, wages, paid visits, operating costs and a transfer ledger; no ownership, stock or relationships yet | First prototype slice |
 | Observation tools | Static map extent; no camera, day/night, population panel or setup UI | Missing or partial |
 | Quality | Twenty backend scenarios plus frontend type/lint/build tooling | Does not establish browser continuity or product acceptance |
 
@@ -105,17 +105,19 @@ Preserve the user's current direction: strict top-down, detailed cartoon art, bu
 - The server tick is deliberately polling-based for this small POC: a WebSocket is not needed to make the authoritative clock smooth. The app sends no browser advance timer; it observes a running world every 250 ms. A later event/delta channel can replace polling without changing the clock contract.
 - `simulation.elapsed_seconds`, `presentation_time_seconds`, `running` and `speed` are persisted in the snapshot. The server advances 15 logical seconds per 250 ms at speed 1, scales that step by speed, and persists a new revision. Existing format-0 saves receive a stopped simulation state on load.
 - Journey objects now accompany the existing walk/train route data as an interim persisted contract. Direct routes are persisted for pet care, return-home and social/cinema recovery from an unexpected current position; the current route graph and schedule still need the step’s full leg-completion/replanning rewrite, so this step is not yet complete.
+- 2026-09-30 movement pass: work and lunch wait for actual arrival; evening grocery, cinema and bar visits now persist travel/activity/return phases, and their durations start on arrival. Walking and pet-care routes retain a leg with distance and progress through save/reload. An interrupted route is replanned from the person's current position. New fixtures declare simulation version `poc-2`; existing `poc-1` snapshots keep their identity and gain the additive fields as they advance.
+- The fixture starts at 07:30, too late for several people to walk from home to the 07:33 Market Square train. They now miss it instead of appearing at the platform. The clock-keyed train branch still needs step 2's later-service queue and boarding recovery; train access/egress and pedestrian movement do not yet share one full journey executor. Browser continuity remains unverified.
 
 ## Step 2 — finish the train, queues and visible passengers
 
 **Depends on:** 1. This completes the outstanding train request before expanding the town.
 
 - [ ] Store one rail path and use it for track drawing, arc-length traversal, coach headings and timetable distances. Remove demand-driven train positioning and the independent frontend train clock.
-- [ ] Model service states: travelling → approaching → stopped/doors open → boarding complete → departing. Progress around the loop continuously, including wraparound and day boundaries, with or without passengers.
-- [ ] Give the existing two passenger coaches four explicit seats each (eight total; locomotive excluded). Persist `train_id`, `car_id`, `seat_id` and passenger ID; do not repack seats when another person leaves.
-- [ ] Maintain station queues ordered by actual arrival time with deterministic tie-breaking. Alight first, then board eligible waiting people into free seats while the train is stopped at that platform. Include finite boarding time.
+- [x] Model service states: travelling → approaching → stopped/doors open → boarding complete → departing. Progress around the loop continuously, including wraparound and day boundaries, with or without passengers. The train now parks at Market Square from 00:00 to 06:00 with doors closed.
+- [x] Give the existing two passenger coaches four explicit seats each (eight total; locomotive excluded). Persist `train_id`, `car_id`, `seat_id` and passenger ID; do not repack seats when another person leaves.
+- [x] Maintain station queues ordered by actual arrival time with deterministic tie-breaking. Alight first, then board eligible waiting people into free seats while the train is stopped at that platform. Include finite boarding time.
 - [ ] Keep overflow passengers visibly queued for the next actual service. Missing a train must not complete a ride or teleport someone to the destination. Allow replanning and truthful lateness.
-- [ ] Show individual seated people through open/cutaway coach roofs. Keep identity colours and selection; click a rider to inspect the same person. Show coach occupancy, queue length and next train in station/train inspectors.
+- [x] Show individual seated people through open/cutaway coach roofs. Keep identity colours and selection; click a rider to inspect the same person. Show coach occupancy, queue length and next train in station/train inspectors.
 - [ ] Align platform geometry with coach doors, queue slots and safe pedestrian access. Render boarding/alighting at the same presentation time as train arrival/departure so network interpolation cannot make people vanish early.
 
 **Done when:** a ten-person crowd fills eight seats, leaves two visible on the platform, and boards those two on a later service. The train takes the same path/timing in an empty-world run. Each rider is visible in a stable seat, alights only at their stop, and survives save/reload while aboard. Verify this in the browser, not only by inspecting state.
@@ -124,7 +126,9 @@ Preserve the user's current direction: strict top-down, detailed cartoon art, bu
 
 - The frontend no longer owns a train clock: it renders the server's scheduled rail distance and shows individual, selectable riders in stable carriage/seat slots. The two passenger coaches hold four people each.
 - Train access and egress use the normal walking speed. A commuter remains on the final local station leg after the nominal shift time instead of being snapped to work.
-- This does **not** complete step 2: there is no persisted station queue, real stop/door/boarding state, finite boarding time or later-service overflow recovery. The next train task is the ten-person crowd acceptance scenario, not more visual polish.
+- The 2026-09-30 station pass adds persisted FIFO queues, 15-second boarding slots, alight-before-board, eight explicit stable seats, later-service overflow recovery, selectable station/train inspectors, and open-door cues. A ten-person isolated scenario fills eight seats, leaves two queued, then boards those two on the next Market Square service; save/reload preserves the queue and occupied seats. Empty and loaded trains share the same timetable position.
+- Folk Loop now completes its last loop at Market Square at midnight, remains parked with doors closed until 06:00, and advertises the next valid departure. Trip choice includes access, timetable wait, ride and egress; a queued resident sees the earliest work ETA and lateness. New fixtures use simulation version `poc-3`; old snapshots gain additive track/station metadata without replacing their identity.
+- Step 2 remains open for browser continuity and queue/platform visual acceptance, plus replanning queued trips when walking becomes preferable. The backend rail geometry now supplies the rendered track and coach position, while timetable segment durations are still explicit values rather than derived from graph edges.
 
 ## Step 3 — connected town geometry and trustworthy journey estimates
 
@@ -199,6 +203,20 @@ Preserve the user's current direction: strict top-down, detailed cartoon art, bu
 
 **Done when:** a resident earns and spends money, food stock changes consistently, and two people cannot simultaneously drive one vehicle. A complete visible car trip starts and ends at valid parking.
 
+### Economy prototype progress (2026-09-30)
+
+- The fixed town now seeds integer-cent personal, shared-household, business and treasury balances. Wages are paid for actual 15-minute work blocks. A saved town-wide contribution percentage (default 50%, adjustable in the inspector) splits each wage between the worker and the household.
+- Grocery trips spend shared household money; bar and cinema visits spend personal money. Each arrival transfers money once to the venue and grocery servings increase only after payment. Businesses pay daily operating costs and wages; an insolvent business closes and stops accepting visits or providing work.
+- Bruno's paid gardening is assigned to Fern Florist. Gardening at home remains a hobby. Existing `poc-9` saves receive the corrected workplace and additive accounts in memory, persisted on their next command.
+- This first economic loop did not complete step 7: stock, detailed ownership, public finance policy, job loss/re-employment and practical car travel remain open. Rates are fixture parameters; the snapshot retains the latest 200 transfers until a durable history/checkpoint policy is added.
+
+### Business recovery and pricing (2026-09-30)
+
+- The fifteen rendered residents do not provide enough customer visits to cover five shops' wages. A deterministic hourly customer count now represents the rest of the town, with separate ledger receipts and supply costs. Staffed businesses receive this income only while open; visible residents' purchases remain separate, pay supply costs, and still raise income. The inspector labels the wider-town customers so they are not mistaken for people on the map.
+- Each business has a saved unit price. Higher prices reduce expected customer count; the current price affects grocery, bar and cinema payments as well as wider-town sales. A resident can take over a closed business by paying its recorded unpaid bills and investing €80, then choosing a price. At 09:00, an affordable resident may also choose an economically viable takeover, preferring former employees. The business reopens with an owner, and retained profits can pay a weekly dividend after a two-day expense reserve.
+- Closed workers are marked out of work and look for a next step during ordinary home time. The previous closure records lacked exact debt claims, so they receive one conservative legacy unpaid bill inferred from the closure event; new closures record the exact creditor and amount. The saved `poc-9` gardener assignment to the park also upgrades to Fern Florist without moving Bruno's current position.
+- This is a compact fixture demand model, not a detailed supply chain or a guarantee that every price and staffing choice is profitable. Browser continuity, broader generation, inventory, business ownership contracts and full job mobility remain open.
+
 ## Step 8 — individual lives and small stories
 
 **Depends on:** 4 and 7.
@@ -249,7 +267,7 @@ Run relevant backend checks and frontend type/lint/build for each affected slice
 
 ## Recommended next implementation
 
-1. Finish the remaining step 1/3 movement seam: route every transition from the entity's current logical position, persist legs, and make arrival—not a wall-clock branch—the only way to begin work, shopping, cinema, bar, sleep or home activity.
-2. Finish step 2's station model: platform queue slots, alight-before-board, doors/boarding duration and later-service overflow recovery. Demonstrate a ten-person crowd filling eight seats while two remain visibly queued.
+1. Run step 2's browser acceptance: ten-person crowd, visible platform positions, open doors, stable coach seats, overflow's later boarding, midnight stop and 06:00 restart. Correct any visual discontinuity, then make queued-trip replanning explicit.
+2. Unify the remaining train and pedestrian legs into one journey executor, including route continuity for corners, pause and delayed observations.
 3. Convert the step 4 prototype slices into typed commitments/activities with explicit duration, opening hours and effects. Preserve household food and dog-care behaviour while making it reproducible and inspectable.
 4. Run the first browser acceptance pass from step 5: pause/resume, a full train trip, social/cinema outing, dog walk, large manual advance and two-tab observation. Record any remaining visual discontinuity before expanding generation or economy.

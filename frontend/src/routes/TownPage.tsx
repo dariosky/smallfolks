@@ -1,9 +1,12 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import {
   advanceWorld,
   createWorld,
   getWorld,
+  setBusinessPrice,
+  setHouseholdContribution,
   setWorldRunning,
+  takeOverBusiness,
   type Entity,
   type Place,
   type World,
@@ -23,6 +26,16 @@ function displayTime(clock: string) {
     weekday: "long",
   }).format(new Date(clock));
 }
+
+function money(cents: number) {
+  return new Intl.NumberFormat("en", { style: "currency", currency: "EUR" }).format(cents / 100);
+}
+
+function scheduledTime(clock: string, scheduledAt: string) {
+  return `${scheduledAt.slice(11, 16)}${scheduledAt.slice(0, 10) > clock.slice(0, 10) ? " tomorrow" : ""}`;
+}
+
+const PRICE_PERCENTS = [70, 80, 90, 100, 110, 120, 130];
 
 export function TownPage() {
   const [world, setWorld] = useState<World | null>(null);
@@ -84,6 +97,40 @@ export function TownPage() {
     }
   }
 
+  async function changeContribution(percent: number) {
+    if (!world) return;
+    try {
+      setWorld(await setHouseholdContribution(world.id, percent));
+      setError("");
+    } catch {
+      setError("Could not update the household contribution.");
+    }
+  }
+
+  async function submitTakeover(event: FormEvent<HTMLFormElement>, placeId: string) {
+    event.preventDefault();
+    if (!world) return;
+    const form = new FormData(event.currentTarget);
+    try {
+      setWorld(await takeOverBusiness(world.id, placeId, String(form.get("buyer_id")), Number(form.get("price_percent"))));
+      setError("");
+    } catch {
+      setError("That resident cannot take over the business at the current balance.");
+    }
+  }
+
+  async function submitBusinessPrice(event: FormEvent<HTMLFormElement>, placeId: string) {
+    event.preventDefault();
+    if (!world) return;
+    const form = new FormData(event.currentTarget);
+    try {
+      setWorld(await setBusinessPrice(world.id, placeId, Number(form.get("price_percent"))));
+      setError("");
+    } catch {
+      setError("Could not change the business price.");
+    }
+  }
+
   async function resumeWorld(worldToResume: World): Promise<World> {
     try {
       return await setWorldRunning(
@@ -112,6 +159,10 @@ export function TownPage() {
       : selected;
   const selectedEntity = currentSelection && isEntity(currentSelection) ? currentSelection : null;
   const selectedPlace = currentSelection && !isEntity(currentSelection) ? currentSelection : null;
+  const trainState = world?.trains?.[0]?.state;
+  const selectedStation = selectedPlace?.kind === "station"
+    ? trainState?.stations.find((station) => station.station_id === selectedPlace.id)
+    : undefined;
   const selectedHousehold =
     selectedEntity?.household_id && world
       ? world.households.find((household) => household.id === selectedEntity.household_id)
@@ -184,6 +235,9 @@ export function TownPage() {
               {selectedEntity ? (
                 <>
                   <p className="activity">{selectedEntity.activity ?? selectedEntity.state}</p>
+                  {selectedEntity.employment_status === "out of work" ? (
+                    <p><strong>Employment:</strong> Out of work while the workplace is closed.</p>
+                  ) : null}
                   <p className="why">
                     <strong>Why now?</strong>
                     {selectedEntity.explanation ??
@@ -192,6 +246,11 @@ export function TownPage() {
                   {selectedEntity.next_commitment ? (
                     <p>
                       <strong>Next:</strong> {selectedEntity.next_commitment}
+                    </p>
+                  ) : null}
+                  {selectedEntity.train_trip ? (
+                    <p>
+                      <strong>Train trip:</strong> {selectedEntity.train_trip.phase} · {selectedEntity.train_trip.departure_id.replace("station:", "")} to {selectedEntity.train_trip.arrival_id.replace("station:", "")}
                     </p>
                   ) : null}
                   {selectedEntity.needs ? (
@@ -214,11 +273,24 @@ export function TownPage() {
                     </p>
                   ) : null}
                   {selectedHousehold ? (
-                    <p>
-                      <strong>Household food:</strong>{" "}
-                      {selectedHousehold.food_servings} servings for {selectedHousehold.member_ids.length}{" "}
-                      people ({selectedHousehold.food_servings / selectedHousehold.member_ids.length} days)
-                    </p>
+                    <>
+                      <p><strong>Personal money:</strong> {money(selectedEntity.money_cents ?? 0)}</p>
+                      <p><strong>Shared household money:</strong> {money(selectedHousehold.money_cents ?? 0)} ({world?.economy?.household_contribution_percent ?? 50}% of wages)</p>
+                      <label>
+                        Share of future wages for every household{" "}
+                        <select
+                          value={world?.economy?.household_contribution_percent ?? 50}
+                          onChange={(event) => void changeContribution(Number(event.target.value))}
+                        >
+                          {[0, 25, 50, 75, 100].map((percent) => <option key={percent} value={percent}>{percent}%</option>)}
+                        </select>
+                      </label>
+                      <p>
+                        <strong>Household food:</strong>{" "}
+                        {selectedHousehold.food_servings} servings for {selectedHousehold.member_ids.length}{" "}
+                        people ({selectedHousehold.food_servings / selectedHousehold.member_ids.length} days)
+                      </p>
+                    </>
                   ) : null}
                   {selectedEntity.social_inclination !== undefined ? (
                     <p>
@@ -235,14 +307,36 @@ export function TownPage() {
                 </>
               ) : (
                 <>
-                  <p className="why">
-                    A semantic place: {labelsFor(currentSelection.kind)}.
-                  </p>
+                  {selectedPlace?.kind === "train" && trainState ? (
+                    <section className="train-details">
+                      <p><strong>Service:</strong> {trainState.service_state} · 06:00–00:00</p>
+                      <p><strong>Doors:</strong> {trainState.doors_open ? "open" : "closed"} · {trainState.passenger_ids.length}/{trainState.capacity} seats occupied</p>
+                      {trainState.carriages.map((carriage, index) => (
+                        <p key={carriage.id}>
+                          <strong>Coach {index + 1}:</strong> {carriage.seats.map((seat) => seat.passenger_id ? world?.people.find((person) => person.id === seat.passenger_id)?.name ?? seat.passenger_id : "empty").join(" · ")}
+                        </p>
+                      ))}
+                    </section>
+                  ) : selectedStation ? (
+                    <section className="station-details">
+                      <p><strong>Next train:</strong> {scheduledTime(world!.clock, selectedStation.next_arrival_at)} arrival · {scheduledTime(world!.clock, selectedStation.next_departure_at)} departure</p>
+                      <p><strong>Queue:</strong> {selectedStation.queue_length} waiting in arrival order</p>
+                      <p><strong>Service hours:</strong> 06:00–00:00; train parks overnight.</p>
+                      <ul>
+                        {world?.station_queues?.find((queue) => queue.station_id === selectedStation.station_id)?.entries.map((entry) => {
+                          const person = world.people.find((item) => item.id === entry.person_id);
+                          return person ? <li key={entry.person_id}><button onClick={() => setSelected(person)} type="button">{person.name}</button></li> : null;
+                        })}
+                      </ul>
+                    </section>
+                  ) : (
+                    <p className="why">A semantic place: {labelsFor(currentSelection.kind)}.</p>
+                  )}
                   {selectedPlace?.kind === "home" ? (
                     selectedHomeHousehold ? (
                       <section className="household-members">
                         <p className="eyebrow">Household</p>
-                        <p>{selectedHomeMembers.length} residents live here</p>
+                        <p>{selectedHomeMembers.length} residents live here · {money(selectedHomeHousehold.money_cents ?? 0)} shared</p>
                         <ul>
                           {selectedHomeMembers.map((member) => (
                             <li key={member.id}>
@@ -257,6 +351,46 @@ export function TownPage() {
                     ) : (
                       <p className="why">This home is currently unoccupied.</p>
                     )
+                  ) : null}
+                  {selectedPlace?.business ? (
+                    <section className="business-details">
+                      <p><strong>Business:</strong> {selectedPlace.business.status} · {money(selectedPlace.business.balance_cents)}</p>
+                      <p><strong>Owner:</strong> {world?.people.find((person) => person.id === selectedPlace.business?.owner_id)?.name ?? "None"}</p>
+                      <p><strong>Price:</strong> {money(selectedPlace.business.unit_price_cents)} {selectedPlace.id === "place:supermarket" ? "per serving" : "per sale"}</p>
+                      <p><strong>Wider town customers today:</strong> {selectedPlace.business.regional_visits_today} · {money(selectedPlace.business.regional_sales_cents_today)} sales</p>
+                      {selectedPlace.business.status === "bankrupt" ? (
+                        <>
+                          <p><strong>Unpaid debt:</strong> {money(selectedPlace.business.debt_cents)}</p>
+                          {world?.people.some((person) => (person.money_cents ?? 0) >= selectedPlace.business!.debt_cents + 8000) ? (
+                          <form key={`takeover-${selectedPlace.id}`} onSubmit={(event) => void submitTakeover(event, selectedPlace.id)}>
+                            <label>Resident
+                              <select name="buyer_id" required>
+                                {world?.people.filter((person) => (person.money_cents ?? 0) >= selectedPlace.business!.debt_cents + 8000).map((person) => (
+                                  <option key={person.id} value={person.id}>{person.name} · {money(person.money_cents ?? 0)}</option>
+                                ))}
+                              </select>
+                            </label>
+                            <label>New price
+                              <select name="price_percent" defaultValue={100}>
+                                {PRICE_PERCENTS.map((percent) => <option key={percent} value={percent}>{percent}% · {money(selectedPlace.business!.base_unit_price_cents * percent / 100)}</option>)}
+                              </select>
+                            </label>
+                            <p>Resident pays the debt and invests {money(8000)} in the business.</p>
+                            <button className="primary-button" type="submit">Take over and reopen</button>
+                          </form>
+                          ) : <p>No resident can yet cover the debt and {money(8000)} working capital.</p>}
+                        </>
+                      ) : selectedPlace.business.owner_id ? (
+                        <form key={`price-${selectedPlace.id}`} onSubmit={(event) => void submitBusinessPrice(event, selectedPlace.id)}>
+                          <label>Price
+                            <select name="price_percent" defaultValue={selectedPlace.business.price_percent}>
+                              {PRICE_PERCENTS.map((percent) => <option key={percent} value={percent}>{percent}% · {money(selectedPlace.business!.base_unit_price_cents * percent / 100)}</option>)}
+                            </select>
+                          </label>
+                          <button className="secondary-button" type="submit">Set price</button>
+                        </form>
+                      ) : null}
+                    </section>
                   ) : null}
                 </>
               )}
@@ -294,6 +428,8 @@ function labelsFor(kind: string) {
       park: "Public park",
       vehicle: "Vehicle",
       pet: "Pet",
+      station: "Station",
+      train: "Train",
     }[kind] ?? kind
   );
 }

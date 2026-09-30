@@ -9,6 +9,7 @@ from sqlmodel import Session, select
 from db import engine
 from generation.fixture_town import clone_fixture
 from persistence.models import WorldSnapshot
+from simulation.economy import PRICE_PERCENT_OPTIONS, price_cents, take_over_business
 from simulation.tick import LOGICAL_TICK_SECONDS, advance, advance_seconds
 from simulation.versions import (
     UnsupportedWorldFormatError,
@@ -98,6 +99,40 @@ def advance_world(
         state = load_world(session, world_id)
         _check_revision(state, expected_revision)
         state = advance(state, minutes)
+        state["revision"] = state.get("revision", 0) + 1
+        save_world(session, state)
+        return state
+
+
+def set_household_contribution(session: Session, world_id: str, percent: int) -> dict:
+    with _world_locks[world_id]:
+        state = load_world(session, world_id)
+        state["economy"]["household_contribution_percent"] = percent
+        state["revision"] = state.get("revision", 0) + 1
+        save_world(session, state)
+        return state
+
+
+def take_over_world_business(
+    session: Session, world_id: str, place_id: str, buyer_id: str, price_percent: int
+) -> dict:
+    with _world_locks[world_id]:
+        state = load_world(session, world_id)
+        take_over_business(state, place_id, buyer_id, price_percent, datetime.fromisoformat(state["clock"]))
+        state["revision"] = state.get("revision", 0) + 1
+        save_world(session, state)
+        return state
+
+
+def set_business_price(session: Session, world_id: str, place_id: str, price_percent: int) -> dict:
+    with _world_locks[world_id]:
+        state = load_world(session, world_id)
+        place = next((place for place in state["places"] if place["id"] == place_id), None)
+        if (place is None or not place.get("business") or place["business"]["status"] != "open"
+            or not place["business"].get("owner_id") or price_percent not in PRICE_PERCENT_OPTIONS):
+            raise ValueError("An owned, open business and valid price are required.")
+        place["business"]["price_percent"] = price_percent
+        place["business"]["unit_price_cents"] = price_cents(place)
         state["revision"] = state.get("revision", 0) + 1
         save_world(session, state)
         return state

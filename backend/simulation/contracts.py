@@ -89,7 +89,7 @@ class CarriageState(TypedDict):
 
 class TrainState(TypedDict):
     id: str
-    service_state: Literal["travelling", "approaching", "stopped", "boarding", "departing"]
+    service_state: Literal["parked", "travelling", "approaching", "stopped", "boarding", "departing"]
     distance: float
     carriages: list[CarriageState]
 

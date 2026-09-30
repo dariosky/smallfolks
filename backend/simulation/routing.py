@@ -73,7 +73,10 @@ def route_length(route: list[Point]) -> float:
 
 
 def position_on_route(route: list[Point], progress: float) -> Point:
-    target_distance = route_length(route) * min(1, max(0, progress))
+    length = route_length(route)
+    if length == 0:
+        return dict(route[-1])
+    target_distance = length * min(1, max(0, progress))
     travelled = 0.0
     for start, end in pairwise(route):
         segment_length = _distance(start, end)

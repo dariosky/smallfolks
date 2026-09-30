@@ -124,6 +124,22 @@
   font-size: 8px;
   font-weight: 900;
 }
+.town-map .station .station-queue-count {
+  fill: #f6f0d8;
+  font-size: 11px;
+  paint-order: stroke;
+  stroke: #3e5360;
+  stroke-width: 3px;
+}
+.town-map .station[role="button"],
+.town-map .folk-train-locomotive[role="button"] {
+  cursor: pointer;
+}
+.town-map .train-open-door {
+  fill: #263d4a;
+  stroke: #f9e4aa;
+  stroke-width: 1px;
+}
 .town-map .map-labels text {
   fill: #507969;
   font:
@@ -759,7 +775,33 @@
   font:
     900 9px Georgia,
     serif;
-  animation: float-z 2s ease-in-out infinite;
+  animation: sleep-zzz-rise 2.4s ease-in-out infinite;
+  opacity: 0;
+}
+.town-map .sleep-z:nth-child(2) {
+  animation-delay: -0.8s;
+  font-size: 11px;
+}
+.town-map .sleep-z:nth-child(3) {
+  animation-delay: -1.6s;
+  font-size: 13px;
+}
+@keyframes sleep-zzz-rise {
+  20% {
+    opacity: 1;
+  }
+  75% {
+    opacity: 0.8;
+  }
+  100% {
+    transform: translateY(-9px);
+    opacity: 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .town-map .sleep-z {
+    opacity: 1;
+  }
 }
 .town-map .map-entity.activity-sleep .person-body {
   transform: rotate(-75deg) translate(-1px, -2px);

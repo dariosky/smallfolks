@@ -794,6 +794,30 @@
   font-family: Georgia, serif;
   font-size: 2rem;
 }
+.business-details form {
+  display: grid;
+  gap: 0.7rem;
+  padding: 0.9rem;
+  border: 1px solid #c7c4a6;
+  border-radius: 10px;
+  background: #fff7df;
+}
+.business-details label {
+  display: grid;
+  gap: 0.25rem;
+  font-weight: 650;
+}
+.business-details select {
+  width: 100%;
+  padding: 0.45rem 0.6rem;
+  border: 1px solid #7b8f80;
+  border-radius: 6px;
+  background: #fffdf5;
+  color: #304448;
+}
+.business-details button {
+  justify-self: start;
+}
 .activity {
   font-weight: 750;
   color: var(--accent-strong);

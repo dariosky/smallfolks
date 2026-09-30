@@ -93,6 +93,7 @@ export function TownMap({ world, selectedId, onSelect }: Props) {
       <TrainLoop
         onSelect={onSelect}
         passengers={trainPassengers}
+        queues={world.station_queues ?? []}
         seed={world.seed}
         train={world.trains?.[0]}
       />
@@ -167,50 +168,68 @@ export function TownMap({ world, selectedId, onSelect }: Props) {
 function TrainLoop({
   train,
   passengers,
+  queues,
   onSelect,
   seed,
 }: {
   train?: Train;
   passengers: Entity[];
+  queues: NonNullable<World["station_queues"]>;
   onSelect: Props["onSelect"];
   seed: number;
 }) {
-  const loop =
-    "M450 58H1090Q1120 58 1120 88V630Q1120 660 1090 660H450Q420 660 420 630V88Q420 58 450 58Z";
+  if (!train?.track?.length) return null;
+  const track = train.track;
+  const loop = track.map((point) => `${point.x},${point.y}`).join(" ");
   const frontDistance = train?.state?.distance ?? 60;
+  const stations = train.stations ?? [];
   return (
     <g className="railway">
-      <path className="rail-bed" d={loop} />
-      <path className="rail-ties" d={loop} />
-      <path className="rail-line" d={loop} />
-      <g className="station" transform="translate(510 58)">
-        <rect height="18" rx="3" width="78" x="-39" y="-9" />
-        <text y="-15">MARKET SQUARE</text>
-      </g>
-      <g className="station" transform="translate(1120 260)">
-        <rect height="78" rx="3" width="18" x="-9" y="-39" />
-        <text transform="rotate(90)" x="14" y="-15">
-          EASTGATE
-        </text>
-      </g>
-      <g className="station" transform="translate(650 660)">
-        <rect height="18" rx="3" width="78" x="-39" y="-9" />
-        <text y="-15">ROWAN HALT</text>
-      </g>
-      <TrainCar distance={frontDistance} kind="locomotive" />
+      <polyline className="rail-bed" fill="none" points={loop} />
+      <polyline className="rail-ties" fill="none" points={loop} />
+      <polyline className="rail-line" fill="none" points={loop} />
+      {stations.map((station) => {
+        const waiting = queues.find((queue) => queue.station_id === station.id)?.entries.length ?? 0;
+        return (
+          <g
+            aria-label={`${station.name}, ${waiting} waiting`}
+            className="station"
+            key={station.id}
+            onClick={() => onSelect({ ...station, kind: "station" })}
+            onKeyDown={(event) => activate(event, () => onSelect({ ...station, kind: "station" }))}
+            role="button"
+            tabIndex={0}
+            transform={`translate(${station.position.x} ${station.position.y})`}
+          >
+            <rect {...station.platform} rx="3" />
+            <text y={station.platform.y - 6}>{station.name.toUpperCase()}</text>
+            {waiting ? <text className="station-queue-count" y={station.platform.y + station.platform.height + 16}>{waiting} waiting</text> : null}
+          </g>
+        );
+      })}
+      <TrainCar
+        distance={frontDistance}
+        kind="locomotive"
+        onSelectTrain={() => onSelect({ id: train.id, kind: "train", name: train.name, position: railPosition(track, frontDistance) })}
+        track={track}
+      />
       <TrainCar
         distance={frontDistance - 48}
         kind="coach"
+        doorsOpen={train.state?.doors_open}
         onSelect={onSelect}
         seed={seed}
         passengers={passengers.filter((person) => person.train_car_index === 0)}
+        track={track}
       />
       <TrainCar
         distance={frontDistance - 96}
         kind="coach"
+        doorsOpen={train.state?.doors_open}
         onSelect={onSelect}
         seed={seed}
         passengers={passengers.filter((person) => person.train_car_index === 1)}
+        track={track}
       />
       {passengers.length ? (
         <text className="train-passenger-count" x="760" y="43">
@@ -223,22 +242,33 @@ function TrainLoop({
 
 function TrainCar({
   distance,
+  doorsOpen,
   kind,
   passengers = [],
   onSelect,
+  onSelectTrain,
   seed,
+  track,
 }: {
   distance: number;
+  doorsOpen?: boolean;
   kind: "locomotive" | "coach";
   passengers?: Entity[];
   onSelect?: Props["onSelect"];
+  onSelectTrain?: () => void;
   seed?: number;
+  track: NonNullable<Train["track"]>;
 }) {
-  const { x, y, heading } = railPosition(distance);
+  const { x, y, heading } = railPosition(track, distance);
   return (
     <g
+      aria-label={kind === "locomotive" ? "Inspect Folk Loop train" : undefined}
       className={`folk-train folk-train-${kind}`}
+      onClick={onSelectTrain}
+      onKeyDown={onSelectTrain ? (event) => activate(event, onSelectTrain) : undefined}
+      role={onSelectTrain ? "button" : undefined}
       style={{ transform: `translate(${x}px, ${y}px) rotate(${heading}deg)` }}
+      tabIndex={onSelectTrain ? 0 : undefined}
       transform={`translate(${x} ${y}) rotate(${heading})`}
     >
       {kind === "locomotive" ? (
@@ -253,6 +283,7 @@ function TrainCar({
           <rect className="train-coach" height="20" rx="3" width="40" x="-20" y="-10" />
           <rect className="train-roof-kit" height="10" rx="1" width="11" x="-5" y="-5" />
           <path className="train-windows" d="M-14-7v14M-4-7v14M6-7v14M16-7v14" />
+          {doorsOpen ? <rect className="train-open-door" x="-3" y="9" width="6" height="4" /> : null}
           {passengers.map((passenger) => (
             <TrainPassenger
               key={passenger.id}
@@ -316,41 +347,17 @@ function TrainPassenger({
   );
 }
 
-const RAIL_TOP = 640;
-const RAIL_SIDE = 542;
-const RAIL_CURVE = (Math.PI * 30) / 2;
-const RAIL_LENGTH = RAIL_TOP * 2 + RAIL_SIDE * 2 + RAIL_CURVE * 4;
-function railPosition(distance: number) {
-  let position = ((distance % RAIL_LENGTH) + RAIL_LENGTH) % RAIL_LENGTH;
-  if (position <= RAIL_TOP) return { x: 450 + position, y: 58, heading: 0 };
-  position -= RAIL_TOP;
-  if (position <= RAIL_CURVE) return roundedCorner(1090, 88, -90, position / RAIL_CURVE, 0);
-  position -= RAIL_CURVE;
-  if (position <= RAIL_SIDE) return { x: 1120, y: 88 + position, heading: 90 };
-  position -= RAIL_SIDE;
-  if (position <= RAIL_CURVE) return roundedCorner(1090, 630, 0, position / RAIL_CURVE, 90);
-  position -= RAIL_CURVE;
-  if (position <= RAIL_TOP) return { x: 1090 - position, y: 660, heading: 180 };
-  position -= RAIL_TOP;
-  if (position <= RAIL_CURVE) return roundedCorner(450, 630, 90, position / RAIL_CURVE, 180);
-  position -= RAIL_CURVE;
-  if (position <= RAIL_SIDE) return { x: 420, y: 630 - position, heading: 270 };
-  position -= RAIL_SIDE;
-  return roundedCorner(450, 88, 180, position / RAIL_CURVE, 270);
-}
-
-function roundedCorner(
-  centerX: number,
-  centerY: number,
-  startAngle: number,
-  progress: number,
-  heading: number,
-) {
-  const angle = ((startAngle + progress * 90) * Math.PI) / 180;
+function railPosition(track: NonNullable<Train["track"]>, distance: number) {
+  const length = track[track.length - 1].distance;
+  const position = ((distance % length) + length) % length;
+  const index = track.findIndex((point) => point.distance >= position);
+  const end = track[Math.max(1, index)];
+  const start = track[Math.max(0, index - 1)];
+  const fraction = (position - start.distance) / (end.distance - start.distance);
   return {
-    x: centerX + 30 * Math.cos(angle),
-    y: centerY + 30 * Math.sin(angle),
-    heading: heading + progress * 90,
+    x: start.x + (end.x - start.x) * fraction,
+    y: start.y + (end.y - start.y) * fraction,
+    heading: (Math.atan2(end.y - start.y, end.x - start.x) * 180) / Math.PI,
   };
 }
 
@@ -730,9 +737,17 @@ function ActivityProp({
       {kind === "sleep" && (
         <>
           <path className="sleep-blanket" d="M-2-7h24v18H-2q5-8 0-18Z" />
-          <text className="sleep-z" x="18" y="-18">
-            zZ
-          </text>
+          <g className="sleep-zzz" aria-hidden="true">
+            <text className="sleep-z" x="20" y="-13">
+              Z
+            </text>
+            <text className="sleep-z" x="28" y="-20">
+              Z
+            </text>
+            <text className="sleep-z" x="36" y="-27">
+              Z
+            </text>
+          </g>
         </>
       )}
       {kind === "read" && (
