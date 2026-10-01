@@ -5,6 +5,7 @@ from typing import Any
 
 from generation.city_layout import ensure_city_layout
 from simulation.buildings import update_building_status
+from simulation.community import ensure_community
 from simulation.economy import ensure_economy
 from simulation.housing import ensure_home_parking
 from simulation.prosperity import ensure_prosperity
@@ -67,10 +68,12 @@ def migrate_snapshot(state: dict[str, Any]) -> dict[str, Any]:
     )
     for train in migrated.get("trains", []):
         train.setdefault("track", rail_track())
-        train.setdefault("stations", [
+        train["stations"] = [
             {key: value for key, value in station.items() if key != "distance"}
             for station in STATIONS.values()
-        ])
+        ]
+        if train.get("state", {}).get("at_station") == STATIONS["market"]["id"]:
+            train["state"]["distance"] = STATIONS["market"]["distance"]
     if migrated.get("generation_version") == "poc-9":
         for person in migrated.get("people", []):
             if (person.get("id") == "person:bruno"
@@ -84,6 +87,7 @@ def migrate_snapshot(state: dict[str, Any]) -> dict[str, Any]:
         ensure_city_layout(migrated)
     ensure_home_parking(migrated)
     ensure_economy(migrated)
+    ensure_community(migrated)
     ensure_prosperity(migrated)
     update_building_status(migrated)
     return migrated

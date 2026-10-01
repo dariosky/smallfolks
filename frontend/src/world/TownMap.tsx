@@ -1,4 +1,6 @@
+import { CommunityWorkVisuals } from "./CommunityWorkVisuals";
 import { usePageVisible } from "../hooks/usePageVisible";
+import { useContinuousHeading } from "../hooks/useContinuousHeading";
 import {
   memo,
   useEffect,
@@ -47,6 +49,8 @@ export function TownMap({
   onCameraChange,
 }: Props) {
   const pageVisible = usePageVisible();
+  const townHour = Number(world.clock.slice(11, 13));
+  const isNight = townHour >= 19 || townHour < 6;
   const svgRef = useRef<SVGSVGElement>(null);
   const [viewport, setViewport] = useState<{ width: number; height: number } | null>(null);
   const [localPan, setPan] = useState({ x: 0, y: 0 });
@@ -178,7 +182,7 @@ export function TownMap({
   return (
     <svg
       aria-label="SmallFolks town map"
-      className={`town-map ${world.simulation.running && pageVisible ? "" : "is-paused"} ${scale < 0.65 ? "is-overview" : ""} ${world.people.length > 150 ? "is-dense" : ""}`}
+      className={`town-map ${isNight ? "is-night" : ""} ${world.simulation.running && pageVisible ? "" : "is-paused"} ${scale < 0.65 ? "is-overview" : ""} ${world.people.length > 150 ? "is-dense" : ""}`}
       ref={svgRef}
       viewBox={`${(mapSize.width - cameraWidth) / 2 + panX} ${(mapSize.height - cameraHeight) / 2 + panY} ${cameraWidth} ${cameraHeight}`}
       onPointerDown={(event) => {
@@ -273,10 +277,16 @@ export function TownMap({
           transform="translate(10 0)"
         />
       </g>
-      <g className="sun-doodle" transform="translate(1170 64)" aria-hidden="true">
-        <circle r="17" />
-        <path d="M0-29v6m0 46v6M-29 0h6m46 0h6M-20-20l4 4m32 32 4 4M20-20l-4 4m-32 32-4 4" />
-      </g>
+      {isNight ? (
+        <g className="moon-doodle" transform="translate(1170 64)" aria-hidden="true">
+          <path d="M8-24A25 25 0 1 0 8 24A29 29 0 0 1 8-24Z" />
+        </g>
+      ) : (
+        <g className="sun-doodle" transform="translate(1170 64)" aria-hidden="true">
+          <circle r="17" />
+          <path d="M0-29v6m0 46v6M-29 0h6m46 0h6M-20-20l4 4m32 32 4 4M20-20l-4 4m-32 32-4 4" />
+        </g>
+      )}
       <g className="fields">
         <path d="M38 610h285v76H38z" />
         <path d="M900 625h190v60H900z" />
@@ -337,6 +347,7 @@ export function TownMap({
         />
       ))}
       <TownTrees plantedTrees={world.planted_trees} />
+      <CommunityWorkVisuals world={world} />
       <TownDetails />
       {(() => {
         const visible = [
@@ -521,6 +532,7 @@ function TrainCar({
   track: NonNullable<Train["track"]>;
 }) {
   const { x, y, heading } = railPosition(track, distance);
+  const rotation = useContinuousHeading(heading);
   return (
     <g
       aria-label={kind === "locomotive" ? "Inspect Folk Loop train" : undefined}
@@ -528,22 +540,27 @@ function TrainCar({
       onClick={onSelectTrain}
       onKeyDown={onSelectTrain ? (event) => activate(event, onSelectTrain) : undefined}
       role={onSelectTrain ? "button" : undefined}
-      style={{ transform: `translate(${x}px, ${y}px) rotate(${heading}deg)` }}
+      style={{ transform: `translate(${x}px, ${y}px) rotate(${rotation}deg)` }}
       tabIndex={onSelectTrain ? 0 : undefined}
-      transform={`translate(${x} ${y}) rotate(${heading})`}
+      transform={`translate(${x} ${y}) rotate(${rotation})`}
     >
       {kind === "locomotive" ? (
         <>
-          <path className="train-locomotive" d="M-21-10H11l11 5v10l-11 5h-32l-7-10z" />
-          <rect className="train-roof-kit" height="10" rx="1" width="10" x="-9" y="-5" />
-          <path className="train-windows" d="M-16-7v14M-5-7v14M6-7v14" />
-          <path className="train-bogies" d="M-16 11h12M5 11h12" />
+          <path className="train-coupler" d="M-27 0h6" />
+          <path className="train-locomotive" d="M-21-10H11Q20-10 22-4v8q-2 6-11 6h-32Z" />
+          <rect className="train-roof-panel" height="14" rx="3" width="24" x="-18" y="-7" />
+          <rect className="train-roof-kit" height="8" rx="2" width="10" x="-15" y="-4" />
+          <path className="train-roof-vents" d="M-12-2v4m3-4v4M0-4v8M3-4v8" />
+          <path className="train-windows" d="M9-7h4q4 0 5 7-1 7-5 7H9q3-7 0-14Z" />
+          <path className="train-roof-highlight" d="M-18-8H7M-18 8H7" />
+          <path className="train-headlights" d="M21-5v2m0 6v2" />
         </>
       ) : (
         <>
-          <rect className="train-coach" height="20" rx="3" width="40" x="-20" y="-10" />
-          <rect className="train-roof-kit" height="10" rx="1" width="11" x="-5" y="-5" />
-          <path className="train-windows" d="M-14-7v14M-4-7v14M6-7v14M16-7v14" />
+          <path className="train-coupler" d="M-26 0h6M20 0h6" />
+          <rect className="train-coach" height="20" rx="5" width="40" x="-20" y="-10" />
+          <rect className="train-windows train-skylight" height="14" rx="3" width="32" x="-16" y="-7" />
+          <path className="train-roof-highlight" d="M-15-9h30M-15 9h30" />
           {doorsOpen ? <rect className="train-open-door" x="-3" y="9" width="6" height="4" /> : null}
           {passengers.map((passenger) => (
             <TrainPassenger
@@ -553,7 +570,6 @@ function TrainCar({
               seed={seed ?? 0}
             />
           ))}
-          <path className="train-bogies" d="M-15 11h12M4 11h12" />
         </>
       )}
     </g>
@@ -1394,8 +1410,9 @@ function PetSprite({ activity }: { activity: ActivityKind }) {
   );
 }
 function VehicleSprite({ sports, driver, heading, highlighted, onSelect }: { sports: boolean; driver?: Entity; heading: number; highlighted: boolean; onSelect: Props["onSelect"] }) {
+  const rotation = useContinuousHeading(heading);
   return (
-    <g className={sports ? "vehicle-body sports-car-body" : "vehicle-body"} transform={`rotate(${heading})`}>
+    <g className={sports ? "vehicle-body sports-car-body" : "vehicle-body"} transform={`rotate(${rotation})`} style={{ transform: `rotate(${rotation}deg)` }}>
       {sports ? (
         <>
           <rect className="entity-hit vehicle-hit" x="-27" y="-14" width="54" height="28" rx="8" />
@@ -1441,7 +1458,8 @@ function VehicleSprite({ sports, driver, heading, highlighted, onSelect }: { spo
           onKeyDown={(event) => { event.stopPropagation(); activate(event, () => onSelect(driver)); }}
           role="button"
           tabIndex={0}
-          transform={`rotate(${-heading})`}
+          style={{ transform: `rotate(${-rotation}deg)` }}
+          transform={`rotate(${-rotation})`}
         >
           <circle className="vehicle-driver-hit" r="8" />
           <circle className="vehicle-driver-head" r="4" />

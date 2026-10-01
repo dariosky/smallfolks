@@ -44,6 +44,15 @@ function money(cents: number) {
   return new Intl.NumberFormat("en", { style: "currency", currency: "EUR" }).format(cents / 100);
 }
 
+const eventTimeFormatter = new Intl.DateTimeFormat("en-GB", {
+  day: "numeric",
+  month: "short",
+  year: "numeric",
+  hour: "2-digit",
+  minute: "2-digit",
+  hourCycle: "h23",
+});
+
 function scheduledTime(clock: string, scheduledAt: string) {
   return `${scheduledAt.slice(11, 16)}${scheduledAt.slice(0, 10) > clock.slice(0, 10) ? " tomorrow" : ""}`;
 }
@@ -310,6 +319,9 @@ export function TownPage() {
                   {selectedEntity.employment_status === "out of work" ? (
                     <p><strong>Employment:</strong> Out of work while the workplace is closed.</p>
                   ) : null}
+                  {selectedEntity.support_paid_date ? (
+                    <p><strong>Unemployment support:</strong> €24 received on {selectedEntity.support_paid_date} · {money(selectedEntity.support_total_cents ?? 0)} total, shared with the household.</p>
+                  ) : null}
                   {selectedEntity.work_days ? (
                     <p><strong>Work days:</strong> {selectedEntity.work_days.map((day) => ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"][day]).join(", ")}</p>
                   ) : null}
@@ -443,6 +455,8 @@ export function TownPage() {
                   ) : null}
                   {selectedPlace?.kind === "home" && world ? <HomeDevelopment world={world} home={selectedPlace} onSelect={setSelected} /> : null}
                   {selectedPlace?.id === "place:townhall" && world ? <TownHallWork world={world} onSelect={setSelected} /> : null}
+                  {selectedPlace?.kind === "park" && selectedPlace.cleanliness !== undefined ? <p><strong>Cleanliness:</strong> {selectedPlace.cleanliness}% · {selectedPlace.cleanup_sessions ?? 0} community cleanups</p> : null}
+                  {selectedPlace?.id === "place:library" ? <p><strong>Community library help:</strong> {selectedPlace.library_help_sessions ?? 0} completed sessions</p> : null}
                   {selectedPlace?.id === "place:bank" && world ? <BankDetails world={world} onSelect={setSelected} /> : null}
                   {selectedPlace?.dealership ? <DealershipDetails workshop={selectedPlace} /> : null}
                   {selectedPlace && (selectedPlace.business || selectedPlace.kind === "workplace") ? (
@@ -501,9 +515,11 @@ export function TownPage() {
               .reverse()
               .slice(0, 4)
               .map((event) => (
-                <p key={`${event.at}-${event.summary}`}>
-                  <time>{event.at}</time>
-                  {event.summary}
+                <p className="event-feed-entry" key={`${event.at}-${event.summary}`}>
+                  <time dateTime={event.at}>
+                    {eventTimeFormatter.format(new Date(event.at))}
+                  </time>
+                  <span>{event.summary}</span>
                 </p>
               ))}
           </section>

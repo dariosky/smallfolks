@@ -17,7 +17,7 @@ export type BuildingOperatingState = {
   closed_since: string | null;
   next_open_at: string | null;
 };
-export type Place = { operating_state?: BuildingOperatingState; id: string; name: string; kind: string; position: Position; estate_gate?: Position; dealership?: { balance_cents: number; cars_sold: number; standard_price_cents: number; sports_price_cents: number }; house_style?: "large" | "mansion"; owner_household_id?: string | null; sale_price_cents?: number; construction_project_id?: string; driveway?: { parking_position: Position; parking_positions?: Position[]; road_position: Position }; business?: {
+export type Place = { cleanliness?: number; cleanup_sessions?: number; library_help_sessions?: number; operating_state?: BuildingOperatingState; id: string; name: string; kind: string; position: Position; estate_gate?: Position; dealership?: { balance_cents: number; cars_sold: number; standard_price_cents: number; sports_price_cents: number }; house_style?: "large" | "mansion"; owner_household_id?: string | null; sale_price_cents?: number; construction_project_id?: string; driveway?: { parking_position: Position; parking_positions?: Position[]; road_position: Position }; business?: {
   balance_cents: number;
   closed_at?: string | null;
   closure_reason?: string;
@@ -77,6 +77,7 @@ export type RenderEntity = {
   palette: string;
 };
 export type VolunteeringProject = {
+  kind?: "tree_planting" | "park_cleanup" | "community_gardening" | "library_help";
   id: string;
   person_id: string;
   parcel_id: string;
@@ -88,8 +89,16 @@ export type VolunteeringProject = {
   started_at?: string;
   completed_at?: string;
 };
+export type MunicipalProject = {
+  id: string; person_id: string; kind: "park_cleanup" | "social_visit" | "library_help" | "tree_planting";
+  site_id: string; position: Position; recipient_id?: string;
+  status: "active" | "completed" | "cancelled"; worked_seconds: number; required_seconds: number;
+  started_at: string; completed_at?: string;
+};
 export type World = {
+  municipal_projects?: MunicipalProject[];
   volunteering_projects?: VolunteeringProject[];
+  community_gardens?: { id: string; position: Position }[];
   planted_trees?: { id: string; position: Position }[];
   loans?: Loan[];
   construction_projects?: ConstructionProject[];
@@ -108,7 +117,7 @@ export type World = {
   };
   places: Place[];
   households: Household[];
-  economy?: { household_contribution_percent: number; treasury_cents: number; bank_cents?: number; construction_cents?: number; ledger: { id: number; at: string; from: string; to: string; amount_cents: number; reason: string }[] };
+  economy?: { community_work_cents?: number; regional_grant_today_cents?: number; regional_grant_total_cents?: number; public_budget_date?: string; support_today_cents?: number; support_total_cents?: number; household_contribution_percent: number; treasury_cents: number; bank_cents?: number; construction_cents?: number; ledger: { id: number; at: string; from: string; to: string; amount_cents: number; reason: string }[] };
   roads: { id: string; points: number[][] }[];
   paths: { id: string; points: number[][] }[];
   people: Entity[];
@@ -139,6 +148,8 @@ export type Entity = {
   carrying_groceries?: boolean;
   role?: string;
   employment_status?: string;
+  support_paid_date?: string;
+  support_total_cents?: number;
   work_days?: number[];
   shift_start_minute?: number;
   shift_end_minute?: number;

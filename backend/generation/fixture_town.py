@@ -3,6 +3,7 @@ from copy import deepcopy
 from generation.city_layout import ensure_city_layout
 from generation.validators import validate_place_layout
 from simulation.buildings import update_building_status
+from simulation.community import ensure_community
 from simulation.economy import ensure_economy
 from simulation.housing import ensure_home_parking
 from simulation.prosperity import ensure_prosperity
@@ -104,10 +105,10 @@ NEW_RESIDENTS = [
     ("mateo", "Mateo Vega", 12, "post-office", "Postal clerk", "host"),
     ("eva", "Eva Vega", 12, "townhall", "Planner", "planner"),
     ("felix", "Felix Vega", 12, "school", "Teacher", "teacher"),
-    ("maya", "Maya Chen", 13, "townhall", "Planner", "planner"),
+    ("maya", "Maya Chen", 13, "townhall", "Town handyman", "handyman"),
     ("noah", "Noah Chen", 13, "post-office", "Postal clerk", "host"),
     ("ada", "Ada Chen", 13, "library", "Librarian", "librarian"),
-    ("sara", "Sara Lind", 14, "townhall", "Planner", "planner"),
+    ("sara", "Sara Lind", 14, "townhall", "Town handyman", "handyman"),
     ("oscar", "Oscar Lind", 14, "clinic", "Nurse", "nurse"),
     ("julia", "Julia Marin", 15, "post-office", "Postal clerk", "host"),
     ("sam", "Sam Wilson", 16, "workshop", "Carpenter", "carpenter"),
@@ -347,6 +348,7 @@ def build_fixture(seed: int) -> dict:
     ensure_city_layout(world)
     ensure_home_parking(world)
     ensure_economy(world)
+    ensure_community(world)
     ensure_prosperity(world)
     update_building_status(world)
     return world

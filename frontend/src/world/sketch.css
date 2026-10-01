@@ -53,6 +53,13 @@
 }
 .town-map .map-ground {
   fill: #cce6ae;
+  transition: fill 1s ease;
+}
+.town-map.is-night {
+  background: #647b68;
+}
+.town-map.is-night .map-ground {
+  fill: #647b68;
 }
 .town-map .fields path {
   fill: url(#field-lines);
@@ -109,6 +116,9 @@
   stroke: #fff2c8;
   stroke-width: 2.5;
   stroke-dasharray: 4 17;
+}
+.town-map.is-night .road:not(.road-access) {
+  stroke: #a68b68;
 }
 .town-map .path {
   stroke: #fff7df;
@@ -268,6 +278,17 @@
     700 11px Georgia,
     serif;
 }
+.town-map.is-night .map-labels text,
+.town-map.is-night .map-note,
+.town-map.is-night .place-name {
+  fill: #fff;
+  paint-order: stroke;
+  stroke: #405548;
+  stroke-linejoin: round;
+}
+.town-map.is-night .map-note {
+  stroke-width: 3;
+}
 .town-map .sun-doodle {
   fill: #ffe399;
   stroke: #dc9254;
@@ -278,6 +299,31 @@
 }
 .town-map .sun-doodle path {
   fill: none;
+}
+.town-map .moon-doodle {
+  fill: #fff2c9;
+  stroke: #a9bbc6;
+  stroke-width: 2.5;
+  stroke-linejoin: round;
+  pointer-events: none;
+}
+.town-map .moon-doodle path {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: moon-rock 8s ease-in-out infinite alternate;
+}
+@keyframes moon-rock {
+  from {
+    transform: translateY(1px) rotate(-4deg);
+  }
+  to {
+    transform: translateY(-2px) rotate(4deg);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .town-map .moon-doodle path {
+    animation: none;
+  }
 }
 .town-map .place {
   cursor: pointer;
@@ -460,6 +506,11 @@
   fill: #a6d486;
   stroke: #588d66;
   stroke-width: 2.5;
+}
+.town-map.is-night .park-lawn,
+.town-map.is-night .mansion-lawn,
+.town-map.is-night .estate-lawn {
+  fill: #59735a;
 }
 .town-map .park-path {
   fill: none;
@@ -659,6 +710,10 @@
 .town-map .folk-train {
   transition: transform 0.25s linear;
 }
+.town-map .vehicle-body,
+.town-map .vehicle-driver {
+  transition: transform 0.25s linear;
+}
 .town-map .train-locomotive {
   fill: #f0786d;
   stroke: #574c48;
@@ -669,12 +724,36 @@
 }
 .town-map .train-roof-kit {
   fill: #92b5ab;
+  stroke: #574c48;
+  stroke-width: 0.7;
+}
+.town-map .train-roof-panel {
+  fill: #f69b88;
+  stroke: #b76559;
+  stroke-width: 0.7;
 }
 .town-map .train-windows {
-  stroke: #8fc9d1;
+  fill: #bde0dc;
+  stroke: #527f83;
+  stroke-width: 0.8;
 }
-.town-map .train-bogies {
+.town-map .train-coupler {
   stroke: #474e50;
+  stroke-width: 2;
+}
+.town-map .train-roof-vents {
+  fill: none;
+  stroke: #52736d;
+  stroke-width: 0.8;
+}
+.town-map .train-roof-highlight {
+  fill: none;
+  stroke: #fff0ce;
+  stroke-width: 0.8;
+}
+.town-map .train-headlights {
+  stroke: #fff0ce;
+  stroke-width: 2;
 }
 .person-name {
   background: none;
@@ -1812,6 +1891,7 @@
 .town-map:is(.is-overview, .is-dense) .map-entity:not(.is-selected):not(.activity-walk) *,
 .town-map:is(.is-overview, .is-dense) .river-ripples,
 .town-map:is(.is-overview, .is-dense) .sun-doodle,
+.town-map:is(.is-overview, .is-dense) .moon-doodle path,
 .town-map:is(.is-overview, .is-dense) .chimney-smoke,
 .town-map:is(.is-overview, .is-dense) .tree-crown,
 .town-map:is(.is-overview, .is-dense) .fountain-jet,

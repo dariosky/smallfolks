@@ -116,6 +116,8 @@ def ensure_economy(world: dict) -> dict:
 
 
 def _balance_ref(world: dict, account_id: str) -> tuple[dict, str]:
+    if account_id in {"regional_grants", "community_work"}:
+        return world["economy"], f"{account_id}_cents"
     if account_id == "bank":
         return world["economy"], "bank_cents"
     if account_id == "construction":
@@ -150,6 +152,8 @@ def transfer(
         return False
     sender, sender_field = _balance_ref(world, from_id)
     recipient, recipient_field = _balance_ref(world, to_id)
+    if from_id == "treasury" and world["economy"].get("public_budget_date") == now.date().isoformat():
+        world["economy"]["public_spent_today_cents"] += cents
     sender[sender_field] -= cents
     recipient[recipient_field] += cents
     ledger = world["economy"]["ledger"]

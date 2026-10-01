@@ -1,6 +1,8 @@
 import { BuildingStatus } from "./BuildingStatus";
+import { act } from "react";
+import { createRoot } from "react-dom/client";
 import { renderToStaticMarkup } from "react-dom/server";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import type { World } from "../api/world";
 import { BankDetails, HomeDevelopment, ResidentProsperity } from "./ProsperityDetails";
 import { TownMap } from "./TownMap";
@@ -41,6 +43,49 @@ const world: World = {
 };
 
 describe("TownMap resident illustrations", () => {
+  it.each([
+    ["05:59", true],
+    ["06:00", false],
+    ["18:59", false],
+    ["19:00", true],
+    ["23:59", true],
+    ["00:00", true],
+  ])("uses the town's day/night appearance at %s", (time, night) => {
+    const markup = renderToStaticMarkup(
+      <TownMap
+        world={{ ...world, clock: `2031-05-21T${time}:00` }}
+        selectedId={null}
+        onSelect={() => {}}
+      />,
+    );
+    expect(markup.includes("is-night")).toBe(night);
+    expect(markup.includes('class="moon-doodle"')).toBe(night);
+    expect(markup.includes('class="sun-doodle"')).toBe(!night);
+  });
+
+  it("turns normal and sports cars from left to up by 90 degrees", async () => {
+    Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
+    vi.stubGlobal("ResizeObserver", class {
+      observe() {}
+      disconnect() {}
+    });
+    const container = document.createElement("div");
+    const root = createRoot(container);
+    const renderHeading = (heading: number) => <TownMap world={{ ...world, people: [], vehicles: ["standard", "sports"].map((model, index) => ({
+      id: `vehicle:${model}`, kind: "vehicle", name: model, model: model === "sports" ? "sports" as const : undefined,
+      position: { x: 300 + index * 60, y: 200 }, heading,
+    })) }} selectedId={null} onSelect={() => {}} />;
+    try {
+      await act(async () => root.render(renderHeading(180)));
+      await act(async () => root.render(renderHeading(-90)));
+      const cars = container.querySelectorAll<SVGGElement>(".vehicle-body");
+      expect(cars.length).toBe(2);
+      for (const car of cars) expect(car.style.transform).toBe("rotate(270deg)");
+    } finally {
+      await act(async () => root.unmount());
+      vi.unstubAllGlobals();
+    }
+  });
   it("shows an in-car resident through the moving vehicle without a second street sprite", () => {
     const markup = renderToStaticMarkup(
       <TownMap
@@ -124,6 +169,9 @@ describe("TownMap resident illustrations", () => {
     expect(markup).toContain("1. person:one in boarding queue");
     expect(markup).toContain("2. person:two in boarding queue");
     expect(markup).toContain("train-open-door");
+    expect(markup).not.toContain("train-bogies");
+    expect(markup).toContain("train-skylight");
+    expect(markup).toContain("train-roof-vents");
   });
 
   it("renders activity cues and separates residents sharing a position", () => {

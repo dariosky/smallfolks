@@ -1,3 +1,4 @@
+import re
 from html import escape
 from typing import TypedDict
 
@@ -66,6 +67,8 @@ def build_meta_html(metadata: PageMetadata) -> str:
 
 
 def inject_meta_html(html: str, meta_html: str) -> str:
+    # Replace the frontend fallback title with the server's page metadata.
+    html = re.sub(r"<title\b[^>]*>.*?</title>", "", html, flags=re.IGNORECASE | re.DOTALL)
     if "<!--APP_META-->" in html:
         return html.replace("<!--APP_META-->", meta_html, 1)
     if "</head>" in html:

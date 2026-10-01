@@ -21,7 +21,14 @@ export function activityKind(activity?: string, role?: string): ActivityKind {
   const value = (activity ?? "").toLowerCase();
   if (value.startsWith("sleeping")) return "sleep";
   if (value.startsWith("reading")) return "read";
+  if (value.startsWith("town work: planting trees")) return "plant";
+  if (value.startsWith("town work: cleaning the park")) return "chores";
+  if (value.startsWith("town work: helping at the library")) return "read";
+  if (value.startsWith("town work: visiting a resident")) return "social";
   if (value.startsWith("volunteering: planting trees")) return "plant";
+  if (value.startsWith("volunteering: community gardening")) return "garden";
+  if (value.startsWith("volunteering: cleaning the park")) return "chores";
+  if (value.startsWith("volunteering: helping at the library")) return "read";
   if (value.startsWith("tending the garden")) return "garden";
   if (value.startsWith("calling")) return "call";
   if (value.startsWith("doing household chores")) return "chores";

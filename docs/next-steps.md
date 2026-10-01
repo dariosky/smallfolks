@@ -398,3 +398,32 @@ initial connection cost, framing and keepalives; they are not OS CPU measurement
 The in-memory publisher follows the existing single-process simulation model.
 Multiple server workers would need shared pub/sub and one simulation owner.
 Production proxies must forward WebSocket upgrade requests for this endpoint.
+
+
+### Community work and unemployment support (2026-10-01)
+
+- [x] Replace restrictive tree-only eligibility with daily voluntary choice, broader interests, and tasks that fit real travel and available time.
+- [x] Add one-hour park cleanup (€6), two-hour community gardening (€12), and one-hour library help (€6), alongside existing four-hour planting (€24). Save progress, reserve payments, and expose completed outcomes.
+- [x] Add unconditional €24/day support for unemployed adults, with household sharing and persisted daily markers; keep support separate from loan-qualifying earned income.
+- [x] Fund public wages, support, and sponsored work through visible regional grants against a daily budget; preserve old saves and activate funding only when simulation time advances.
+- [x] Show grants, treasury, reserved pay, support recipients, task choices, park cleanliness, flowerbeds, and library help in town inspectors/map.
+
+Game defaults: regional funding starts with €1 billion; no local taxes or job-search system. Existing student visuals exclude students from adult support/tasks. Support has no work requirement; reopening stops future payments without clawbacks. Source of low participation was the five-hour requirement, nature gate, and depleted treasury in the older saved town.
+
+Saved-town validation also found that residents had zero boredom. Strong activity interests (at least 0.5) therefore motivate the daily voluntary choice even without boredom; no needs are reset or broadened.
+
+
+Validation: 128 backend tests passed; the existing missed-train test also fails with community funding/volunteering disabled and is outside this change. All 60 frontend tests, lint/typecheck, production build, focused Ruff checks and diff checks passed. Separate desktop/mobile browser checks against a temporary database verified task outcomes, Town Hall payments, clickable support recipients, and no page errors or horizontal overflow. Three-day in-memory runs of both saved towns each completed a park cleanup; regional funding sustained the older town's treasury. Existing employment meant no support recipients in those saved-town runs; closed-workplace support and reopening were verified in isolated tests. Participation remains constrained by food, needs, and work schedules.
+
+
+### Town Hall staffing and useful public shifts (2026-10-01)
+
+- [x] Keep Sofia Costa and Eva Vega as planners; convert Maya Chen and Sara Lind to town handymen in new towns and existing saves, preserving physical and financial state.
+- [x] Route paid shifts to parks below 50% cleanliness, then companionship/library social work, then tree planting; retain progress during urgent cleanup interruptions, meals, rest, and days off.
+- [x] Keep €12/hour public wages and household sharing, pay only actual on-site work, and prevent an additional volunteering stipend for municipal assignments.
+- [x] Share site/parcel reservations between volunteers and handymen, and show municipal workers and saved task progress in Town Hall.
+
+Defaults: original weekday shifts remain; one-hour cleanup raises cleanliness by 40; companionship targets awake residents at home with social need at least 60 and reduces it by 35 once per recipient/day; library support is one shared hour per day; trees need four accumulated work hours. Existing smaller saves do not gain new residents merely to achieve a staffing count.
+
+
+Validation: 143 backend tests passed, with the previously identified unrelated missed-train test still failing; all 61 frontend tests, lint/typecheck, production build, focused Ruff checks, and diff checks passed. Focused municipal tests cover role migration, strict 50% eligibility, separate sites, normal wages, saved/preempted tree progress, gradual companionship benefits and recipient departure, daily library support, meal/rest breaks, days off, normal ticks, and zero-time advances. A two-day in-memory run of the saved city completed cleanup, companionship, library help, and a tree while retaining unfinished planting progress and positive treasury funds.

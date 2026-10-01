@@ -18,7 +18,9 @@ def test_unemployed_resident_walks_plants_and_is_paid_once_after_four_hours():
     next(p for p in world["places"] if p["id"] == person["workplace_id"])["business"][
         "status"
     ] = "bankrupt"
-    person.update(preferred_wake_minute=480, day_off_sleep_in_minutes=0)
+    person.update(
+        preferred_wake_minute=480, day_off_sleep_in_minutes=0, nature_inclination=1
+    )
     person["needs"].update(hunger=0, rest=0)
     origin = dict(person["position"])
     advance_seconds(world, 15)
@@ -41,6 +43,7 @@ def test_unemployed_resident_walks_plants_and_is_paid_once_after_four_hours():
     now = datetime.fromisoformat(world["clock"])
     before = person["money_cents"]
     treasury = world["economy"]["treasury_cents"]
+    escrow = world["economy"]["community_work_cents"]
     args = (world, person, now)
     run_volunteering(
         *args, PLANTING_SECONDS - 15, 1080, True, _walk_from_current_position, _at_place
@@ -49,7 +52,8 @@ def test_unemployed_resident_walks_plants_and_is_paid_once_after_four_hours():
     run_volunteering(*args, 15, 1080, True, _walk_from_current_position, _at_place)
     assert project["status"] == "completed"
     assert person["money_cents"] == before + 1200
-    assert world["economy"]["treasury_cents"] == treasury - 2400
+    assert world["economy"]["treasury_cents"] == treasury
+    assert world["economy"]["community_work_cents"] == escrow - 2400
     assert len(world["planted_trees"]) == 1
     assert not run_volunteering(
         *args, 15, 1080, True, _walk_from_current_position, _at_place
@@ -63,6 +67,10 @@ def test_nature_preference_free_time_needs_and_parcel_reservations():
     people = world["people"][:2]
     for person in people:
         person["nature_inclination"] = 1
+        person["volunteering_choice"] = {
+            "date": now.date().isoformat(),
+            "accepted": True,
+        }
         person["needs"].update(hunger=0, rest=0, boredom=70)
     person = people[0]
 
@@ -72,9 +80,9 @@ def test_nature_preference_free_time_needs_and_parcel_reservations():
         )
 
     assert not run(person, 600)
-    person["nature_inclination"] = 0
+    person["volunteering_choice"]["accepted"] = False
     assert not run(person)
-    person["nature_inclination"] = 1
+    person["volunteering_choice"]["accepted"] = True
     person["needs"]["hunger"] = 90
     assert not run(person)
     person["needs"]["hunger"] = 0
@@ -97,6 +105,7 @@ def test_planting_completes_through_normal_ticks():
     person = next(p for p in world["people"] if p["role"] == "Teacher")
     person.update(preferred_wake_minute=480, day_off_sleep_in_minutes=0)
     person["nature_inclination"] = 1
+    person["volunteering_choice"] = {"date": "2031-05-17", "accepted": True}
     person["needs"].update(hunger=0, rest=0, boredom=70)
     advance_seconds(world, 6 * 60 * 60)
     projects = [

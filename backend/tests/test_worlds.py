@@ -35,6 +35,7 @@ from simulation.tick import (
     _walking_minutes,
     advance,
     advance_seconds,
+    rail_track,
 )
 from simulation.versions import WORLD_FORMAT_VERSION, migrate_snapshot
 
@@ -211,9 +212,38 @@ def test_late_worker_reaches_work_before_working_and_route_survives_reload():
     assert "direct_walk" not in rider
 
 
+def test_station_platforms_and_stopped_trains_fit_on_straight_track():
+    track = rail_track()
+    for station in STATIONS.values():
+        start, end = next(
+            (start, end) for start, end in pairwise(track)
+            if start["distance"] <= station["distance"] < end["distance"]
+        )
+        assert start["x"] == end["x"] or start["y"] == end["y"]
+        # Rear coach is 96 units behind the locomotive, with a 20-unit half-length.
+        assert station["distance"] - 116 >= start["distance"]
+        assert station["distance"] + 22 <= end["distance"]
+        axis, size = ("x", "width") if start["y"] == end["y"] else ("y", "height")
+        platform_start = station["position"][axis] + station["platform"][axis]
+        platform_end = platform_start + station["platform"][size]
+        assert min(start[axis], end[axis]) <= platform_start
+        assert platform_end <= max(start[axis], end[axis])
+
+
+def test_saved_market_stop_moves_with_its_station_on_load():
+    saved = build_fixture(78)
+    train = saved["trains"][0]
+    train["stations"][0]["position"] = {"x": 510, "y": 58}
+    train["state"] = {"at_station": "station:market", "distance": 60}
+    loaded = migrate_snapshot(saved)
+    assert saved["trains"][0]["state"]["distance"] == 60
+    assert loaded["trains"][0]["state"]["distance"] == STATIONS["market"]["distance"]
+    assert loaded["trains"][0]["stations"][0]["position"] == STATIONS["market"]["position"]
+
+
 def test_train_uses_stable_seats_and_alights_at_the_backend_stop():
     world = build_fixture(78)
-    station = {"id": "station:market", "position": {"x": 510, "y": 58}}
+    station = STATIONS["market"]
     for person in world["people"]:
         if person["id"] in {"person:marco", "person:tom", "person:ana", "person:sofia", "person:lucas"}:
             _start_at(person, station)

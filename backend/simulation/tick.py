@@ -2,6 +2,11 @@ from datetime import datetime, timedelta
 from math import atan2, ceil, degrees, hypot
 
 from simulation.buildings import update_building_status
+from simulation.community import (
+    advance_community_conditions,
+    ensure_community,
+    fund_community,
+)
 from simulation.economy import (
     BUSINESS_HOURS,
     can_pay,
@@ -17,6 +22,7 @@ from simulation.economy import (
 )
 from simulation.housing import home_parking_point
 from simulation.mansions import inside_mansion
+from simulation.municipal_work import is_handyman, run_municipal_work
 from simulation.prosperity import (
     CAR_PRICE,
     SPORTS_CAR_PRICE,
@@ -61,8 +67,9 @@ STATIONS = {
     "market": {
         "id": "station:market",
         "name": "Market Square",
-        "distance": 60,
-        "position": {"x": 510, "y": 58},
+        # Leave room for the platform and both trailing coaches after the bend.
+        "distance": 140,
+        "position": {"x": 590, "y": 58},
         "platform": {"x": -120, "y": -9, "width": 160, "height": 18},
     },
     "eastgate": {
@@ -1307,6 +1314,7 @@ def _advance_step(world: dict, seconds: int) -> dict:
     ensure_schedules(world)
     ensure_economy(world)
     ensure_prosperity(world)
+    ensure_community(world)
     previous = datetime.fromisoformat(world["clock"])
     now = previous + timedelta(seconds=seconds)
     world["clock"] = now.isoformat(timespec="seconds")
@@ -1320,10 +1328,10 @@ def _advance_step(world: dict, seconds: int) -> dict:
     minute_of_day = now.hour * 60 + now.minute + now.second / 60
     train_state = _service_state(minute_of_day)
     world["trains"][0]["track"] = rail_track()
-    world["trains"][0].setdefault("stations", [
+    world["trains"][0]["stations"] = [
         {key: value for key, value in station.items() if key != "distance"}
         for station in STATIONS.values()
-    ])
+    ]
     for person in world["people"]:
         _restore_legacy_train_trip(person)
         if person.get("train_trip", {}).get("phase") == "aboard":
@@ -1342,6 +1350,9 @@ def _advance_step(world: dict, seconds: int) -> dict:
     if seconds:
         consider_prosperity(world, now)
         assign_construction(world)
+    if seconds:
+        fund_community(world, now)
+        advance_community_conditions(world, seconds)
     pippin = world["pets"][0]
     _ensure_pet_walk_contract(world, pippin, now)
     _update_pet_walk_need(pippin, now)
@@ -1385,7 +1396,10 @@ def _advance_step(world: dict, seconds: int) -> dict:
         if not (working_today and commute_start <= current_minutes < shift_end):
             free_until = commute_start if working_today and current_minutes < commute_start else 18 * 60
             if run_volunteering(world, person, now, seconds, free_until, unemployed,
-                                _walk_from_current_position, _at_place):
+                                _walk_from_current_position, _at_place,
+                                travel_minutes=lambda start, site: max(2, ceil(route_length(
+                                    _residential_walk_route(world, start["position"], _position_at(start, site))
+                                ) / WALKING_SPEED))):
                 continue
         if person.get("vehicle_purchase") and 9 * 60 <= current_minutes < 20 * 60:
             model = person["vehicle_purchase"]["model"]
@@ -1432,6 +1446,10 @@ def _advance_step(world: dict, seconds: int) -> dict:
                 _move_to(person, site, "Working on a house expansion", "This carpenter is completing a paid building contract.", "Finish the home and driveway")
                 if seconds:
                     work_on_expansion(world, person, project, seconds, now)
+            continue
+        if working_today and is_handyman(person) and shift_start <= current_minutes < shift_end:
+            run_municipal_work(world, person, now, seconds, _walk_from_current_position,
+                               _at_place, _eat_lunch_at_work, _sleep_at_home)
             continue
         if commute_start <= current_minutes < shift_end and not _at_place(person, work) and shift_start == 8 * 60:
             train_journey = _train_journey({"position": person["position"]}, work, now)
