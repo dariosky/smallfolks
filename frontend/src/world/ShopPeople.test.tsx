@@ -28,8 +28,23 @@ describe("ShopPeople", () => {
   });
 
   it("marks an employee present and provides clear empty states", () => {
-    expect(render([person("Worker", { workplace_id: place.id, target_place_id: place.id })])).toContain("Employee · Here now");
+    const markup = render([person("Worker", { workplace_id: place.id, target_place_id: place.id })]);
+    expect(markup).toContain("Employee · Here now");
+    expect(markup.match(/<span>Worker<\/span>/g)).toHaveLength(1);
+    expect(markup).toContain("No visitors are here right now.");
     expect(render([])).toContain("No current employees.");
-    expect(render([])).toContain("No one is here right now.");
+    expect(render([])).toContain("No visitors are here right now.");
+  });
+
+  it("lists present employees once while keeping visitors in Here now", () => {
+    const markup = render([
+      person("Worker", { workplace_id: place.id, target_place_id: place.id }),
+      person("Customer", { target_place_id: place.id }),
+    ]);
+    const [employees, visitors] = markup.split('<p class="eyebrow">Here now</p>');
+    expect(employees).toContain("Worker");
+    expect(employees).toContain("Employee · Here now");
+    expect(visitors).toContain("Customer");
+    expect(visitors).not.toContain("Worker");
   });
 });

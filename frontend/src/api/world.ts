@@ -95,11 +95,22 @@ export type MunicipalProject = {
   status: "active" | "completed" | "cancelled"; worked_seconds: number; required_seconds: number;
   started_at: string; completed_at?: string;
 };
+export type Tree = {
+  id: string;
+  kind: "tree";
+  name: string;
+  position: Position;
+  planted_at?: string | null;
+  planted_by_id?: string | null;
+  planted_by_name?: string | null;
+  planting_reason?: "volunteering" | "town_employee" | "existing_landscape" | null;
+};
 export type World = {
+  scenery_trees?: Tree[];
   municipal_projects?: MunicipalProject[];
   volunteering_projects?: VolunteeringProject[];
   community_gardens?: { id: string; position: Position }[];
-  planted_trees?: { id: string; position: Position }[];
+  planted_trees?: Tree[];
   loans?: Loan[];
   construction_projects?: ConstructionProject[];
   map_size?: { width: number; height: number };

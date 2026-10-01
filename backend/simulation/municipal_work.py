@@ -3,6 +3,7 @@
 from math import hypot
 
 from simulation.economy import pay_work_seconds
+from simulation.trees import planting_record
 from simulation.volunteering import PLANTING_SECONDS, _library_end, empty_parcels
 
 TASK_LABELS = {
@@ -249,9 +250,11 @@ def run_municipal_work(world, person, now, seconds, walk, at_place, eat, rest) -
         )
         relief_points = project["worked_seconds"] * 35 // project["required_seconds"]
         relief = max(0, relief_points - project.get("social_relief_points", 0))
-        recipient["needs"]["social"] = max(
-            0, recipient["needs"].get("social", 0) - relief
-        )
+        for participant in (person, recipient):
+            for need in ("social", "boredom"):
+                participant["needs"][need] = max(
+                    0, participant["needs"].get(need, 0) - relief
+                )
         project["social_relief_points"] = relief_points
     if project["worked_seconds"] < project["required_seconds"]:
         return
@@ -270,7 +273,7 @@ def run_municipal_work(world, person, now, seconds, walk, at_place, eat, rest) -
         site["municipal_library_help_date"] = now.date().isoformat()
     else:
         world.setdefault("planted_trees", []).append(
-            {"id": project["id"], "position": project["position"]}
+            planting_record(project, person, now, "town_employee")
         )
     world["events"].append(
         {

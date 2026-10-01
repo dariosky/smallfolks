@@ -11,6 +11,8 @@ export function ShopPeople({ place, people, onSelect }: {
     !person.route?.length && !person.direct_walk && !person.on_train && !person.in_vehicle_id && !person.car_trip &&
     Math.hypot(person.position.x - place.position.x, person.position.y - place.position.y) < 55,
   );
+  const employeeIds = new Set(employees.map((person) => person.id));
+  const visitors = present.filter((person) => !employeeIds.has(person.id));
   const list = (members: Entity[], attendance: boolean) => (
     <ul>
       {members.map((person) => (
@@ -28,7 +30,7 @@ export function ShopPeople({ place, people, onSelect }: {
       <p className="eyebrow">Employees</p>
       {employees.length ? list(employees, false) : <p>No current employees.</p>}
       <p className="eyebrow">Here now</p>
-      {present.length ? list(present, true) : <p>No one is here right now.</p>}
+      {visitors.length ? list(visitors, true) : <p>No visitors are here right now.</p>}
     </section>
   );
 }

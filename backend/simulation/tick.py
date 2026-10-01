@@ -46,6 +46,7 @@ from simulation.routing import (
     route_length,
 )
 from simulation.schedules import ensure_schedules, sleep_window
+from simulation.trees import ensure_trees
 from simulation.volunteering import run_volunteering
 
 WALKING_SPEED = 18
@@ -1785,6 +1786,7 @@ def _advance_step(world: dict, seconds: int) -> dict:
             if pippin["walk_status"] != "comfortable"
             else "Pippin is safe at home and has plenty of walk autonomy remaining."
         )
+    ensure_trees(world)
     update_building_status(world, observed=True)
     world["events"] = world["events"][-12:]
     return world

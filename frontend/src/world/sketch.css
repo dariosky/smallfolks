@@ -86,20 +86,20 @@
   stroke-width: 2.2;
   stroke-linecap: round;
   stroke-dasharray: 22 32;
-  opacity: .7;
+  opacity: 0.7;
   animation: water-flow 4s linear infinite;
 }
 .town-map .river-current-left {
   stroke-width: 1.3;
   stroke-dasharray: 12 42;
-  opacity: .5;
+  opacity: 0.5;
   animation-duration: 6s;
   animation-delay: -2s;
 }
 .town-map .river-current-right {
   stroke-width: 1.6;
   stroke-dasharray: 4 50;
-  opacity: .6;
+  opacity: 0.6;
   animation-duration: 5s;
   animation-delay: -3s;
 }
@@ -1588,18 +1588,51 @@
   font-weight: bold;
 }
 
-.town-map .vehicle.palette-ruby { --vehicle-paint: #b51548; }
-.town-map .vehicle.palette-sapphire { --vehicle-paint: #2859dc; }
-.town-map .vehicle.palette-emerald { --vehicle-paint: #09816b; }
-.town-map .vehicle.palette-amethyst { --vehicle-paint: #9146ca; }
-.town-map .vehicle.palette-champagne { --vehicle-paint: #d5b25a; }
-.town-map .sports-car-body .vehicle-shell { stroke-width: 1.5; }
-.town-map .sports-car-body .vehicle-roof { fill: #253e4b; stroke: #c7d4d7; stroke-width: .8; }
+.town-map .vehicle.palette-ruby {
+  --vehicle-paint: #b51548;
+}
+.town-map .vehicle.palette-sapphire {
+  --vehicle-paint: #2859dc;
+}
+.town-map .vehicle.palette-emerald {
+  --vehicle-paint: #09816b;
+}
+.town-map .vehicle.palette-amethyst {
+  --vehicle-paint: #9146ca;
+}
+.town-map .vehicle.palette-champagne {
+  --vehicle-paint: #d5b25a;
+}
+.town-map .sports-car-body .vehicle-shell {
+  stroke-width: 1.5;
+}
+.town-map .sports-car-body .vehicle-roof {
+  fill: #253e4b;
+  stroke: #c7d4d7;
+  stroke-width: 0.8;
+}
 .town-map .sports-car-body .vehicle-windshield,
-.town-map .sports-car-body .vehicle-rear-window { fill: #284658; stroke: #90c5d5; stroke-width: .8; }
-.town-map .sports-car-spoiler { fill: #24353f; stroke: #dae4e1; stroke-width: .7; }
-.town-map .sports-car-vents { fill: none; stroke: #233b43; stroke-width: 1.5; }
-.town-map .sports-car-highlight { fill: none; stroke: #fff1d6; stroke-width: .8; opacity: .7; }
+.town-map .sports-car-body .vehicle-rear-window {
+  fill: #284658;
+  stroke: #90c5d5;
+  stroke-width: 0.8;
+}
+.town-map .sports-car-spoiler {
+  fill: #24353f;
+  stroke: #dae4e1;
+  stroke-width: 0.7;
+}
+.town-map .sports-car-vents {
+  fill: none;
+  stroke: #233b43;
+  stroke-width: 1.5;
+}
+.town-map .sports-car-highlight {
+  fill: none;
+  stroke: #fff1d6;
+  stroke-width: 0.8;
+  opacity: 0.7;
+}
 
 .town-map .entrance-steps {
   stroke: #574c48;
@@ -1608,62 +1641,274 @@
 }
 
 /* Driveway homes have a taller country-house silhouette and planted grounds. */
-.town-map .estate-lawn { fill: #bdd398; stroke: #91ad78; stroke-width: 1; }
-.town-map .estate-garden-walk { fill: #e8deca; stroke: #c4bba6; stroke-width: 1; }
-.town-map .estate-hedge { fill: none; stroke: #638660; stroke-width: 6; stroke-linecap: round; stroke-linejoin: round; }
-.town-map .estate-flower-bed { stroke: #987958; stroke-width: 7; stroke-linecap: round; }
-.town-map .estate-flower-stem { stroke: #638660; stroke-width: 1.3; }
-.town-map .estate-flower { fill: #d88c9e; }
-.town-map .estate-flower-gold { fill: #f0ce78; }
-.town-map .estate-tree-trunk { stroke: #8d735c; stroke-width: 3; }
-.town-map .estate-tree-crown { fill: #7ca274; stroke: #577c5b; stroke-width: 1.5; }
-.town-map .estate-wall, .town-map .estate-wing, .town-map .estate-dormer {
-  fill: #f7ecd7; stroke: #59645e; stroke-width: 2; stroke-linejoin: round;
+.town-map .estate-lawn {
+  fill: #bdd398;
+  stroke: #91ad78;
+  stroke-width: 1;
 }
-.town-map .estate-side { fill: #d7cdb7; stroke: #59645e; stroke-width: 2; }
-.town-map .estate-roof, .town-map .estate-wing-roof, .town-map .estate-porch-roof {
-  fill: #667983; stroke: #465860; stroke-width: 2.3; stroke-linejoin: round;
+.town-map .estate-garden-walk {
+  fill: #e8deca;
+  stroke: #c4bba6;
+  stroke-width: 1;
 }
-.town-map .estate-roof-side { fill: #495e69; stroke: #465860; stroke-width: 2; }
-.town-map .estate-roof-lines { stroke: #8ea0a5; stroke-width: 1; fill: none; }
-.town-map .estate-dormer-roof { stroke: #465860; stroke-width: 3; fill: none; stroke-linejoin: round; }
-.town-map .estate-chimney { fill: #c8997d; stroke: #59645e; stroke-width: 1.8; }
-.town-map .estate-window { fill: #b2d9de; stroke: #62716e; stroke-width: 1.5; }
-.town-map .estate-window-bars { fill: none; stroke: #fff9e9; stroke-width: 1.4; }
-.town-map .estate-shutters { fill: none; stroke: #6b8b7c; stroke-width: 3; }
-.town-map .estate-door { fill: #557469; stroke: #445d55; stroke-width: 1.8; }
-.town-map .estate-porch-floor { fill: #d8cbb7; stroke: #7e8070; stroke-width: 1.2; }
-.town-map .estate-porch-columns { stroke: #fdf7e8; stroke-width: 4; }
-.town-map .estate-porch-rail { fill: none; stroke: #ede3ce; stroke-width: 2; }
-.town-map .estate-steps { fill: none; stroke: #a99c87; stroke-width: 2; stroke-linecap: round; }
+.town-map .estate-hedge {
+  fill: none;
+  stroke: #638660;
+  stroke-width: 6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.town-map .estate-flower-bed {
+  stroke: #987958;
+  stroke-width: 7;
+  stroke-linecap: round;
+}
+.town-map .estate-flower-stem {
+  stroke: #638660;
+  stroke-width: 1.3;
+}
+.town-map .estate-flower {
+  fill: #d88c9e;
+}
+.town-map .estate-flower-gold {
+  fill: #f0ce78;
+}
+.town-map .estate-tree-trunk {
+  stroke: #8d735c;
+  stroke-width: 3;
+}
+.town-map .estate-tree-crown {
+  fill: #7ca274;
+  stroke: #577c5b;
+  stroke-width: 1.5;
+}
+.town-map .estate-wall,
+.town-map .estate-wing,
+.town-map .estate-dormer {
+  fill: #f7ecd7;
+  stroke: #59645e;
+  stroke-width: 2;
+  stroke-linejoin: round;
+}
+.town-map .estate-side {
+  fill: #d7cdb7;
+  stroke: #59645e;
+  stroke-width: 2;
+}
+.town-map .estate-roof,
+.town-map .estate-wing-roof,
+.town-map .estate-porch-roof {
+  fill: #667983;
+  stroke: #465860;
+  stroke-width: 2.3;
+  stroke-linejoin: round;
+}
+.town-map .estate-roof-side {
+  fill: #495e69;
+  stroke: #465860;
+  stroke-width: 2;
+}
+.town-map .estate-roof-lines {
+  stroke: #8ea0a5;
+  stroke-width: 1;
+  fill: none;
+}
+.town-map .estate-dormer-roof {
+  stroke: #465860;
+  stroke-width: 3;
+  fill: none;
+  stroke-linejoin: round;
+}
+.town-map .estate-chimney {
+  fill: #c8997d;
+  stroke: #59645e;
+  stroke-width: 1.8;
+}
+.town-map .estate-window {
+  fill: #b2d9de;
+  stroke: #62716e;
+  stroke-width: 1.5;
+}
+.town-map .estate-window-bars {
+  fill: none;
+  stroke: #fff9e9;
+  stroke-width: 1.4;
+}
+.town-map .estate-shutters {
+  fill: none;
+  stroke: #6b8b7c;
+  stroke-width: 3;
+}
+.town-map .estate-door {
+  fill: #557469;
+  stroke: #445d55;
+  stroke-width: 1.8;
+}
+.town-map .estate-porch-floor {
+  fill: #d8cbb7;
+  stroke: #7e8070;
+  stroke-width: 1.2;
+}
+.town-map .estate-porch-columns {
+  stroke: #fdf7e8;
+  stroke-width: 4;
+}
+.town-map .estate-porch-rail {
+  fill: none;
+  stroke: #ede3ce;
+  stroke-width: 2;
+}
+.town-map .estate-steps {
+  fill: none;
+  stroke: #a99c87;
+  stroke-width: 2;
+  stroke-linecap: round;
+}
 
-.town-map .mansion-lawn { fill: #b5ce92; stroke: #8ea975; stroke-width: 1.5; }
-.town-map .mansion-wall { fill: none; stroke: #c6b697; stroke-width: 8; stroke-linejoin: round; }
-.town-map .mansion-wall-cap { fill: none; stroke: #eee0c5; stroke-width: 2; }
-.town-map .mansion-garden-path { fill: none; stroke: #e5ddbd; stroke-width: 9; stroke-linecap: round; }
-.town-map .mansion-driveway { fill: none; stroke: #b3b0a2; stroke-width: 20; stroke-linejoin: round; }
-.town-map .mansion-parking rect { fill: #b3b0a2; stroke: #f7edce; stroke-width: 1.5; }
-.town-map .mansion-parking text { fill: #f7edce; font-size: 10px; text-anchor: middle; font-family: serif; }
-.town-map .mansion-flower-bed { fill: #987b5d; stroke: #719264; stroke-width: 4; }
-.town-map .mansion-hedge { fill: none; stroke: #64875e; stroke-width: 7; stroke-linecap: round; }
-.town-map .mansion-facade, .town-map .mansion-dormer { fill: #fff0d9; stroke: #677065; stroke-width: 2.2; }
-.town-map .mansion-wing { fill: #ede1c9; stroke: #677065; stroke-width: 2; }
-.town-map .mansion-roof, .town-map .mansion-wing-roof { fill: #587481; stroke: #3d5864; stroke-width: 2.5; stroke-linejoin: round; }
-.town-map .mansion-roof-lines { fill: none; stroke: #91a6ad; stroke-width: 1.3; }
-.town-map .mansion-dormer-roof { fill: none; stroke: #3d5864; stroke-width: 3; stroke-linejoin: round; }
-.town-map .mansion-window { fill: #a7d3dc; stroke: #758b8d; stroke-width: 1.5; }
-.town-map .mansion-window-bars { fill: none; stroke: #fff9e9; stroke-width: 1.5; }
-.town-map .mansion-floor-trim { fill: none; stroke: #d1c5a9; stroke-width: 3; }
-.town-map .mansion-door { fill: #48685b; stroke: #38584c; stroke-width: 2; }
-.town-map .mansion-door-trim { fill: none; stroke: #d4be91; stroke-width: 2; }
-.town-map .mansion-porch-floor { fill: #d9cbb1; stroke: #8c8e7d; stroke-width: 1.5; }
-.town-map .mansion-columns { stroke: #fffaf0; stroke-width: 5; }
-.town-map .mansion-portico { fill: #eee0bf; stroke: #8a8d78; stroke-width: 2; }
-.town-map .mansion-portico-trim { fill: none; stroke: #b6a67f; stroke-width: 1.5; }
-.town-map .mansion-balustrade { fill: none; stroke: #fff3da; stroke-width: 2.5; }
-.town-map .mansion-gate-pillar { fill: #e2d1b0; stroke: #a19378; stroke-width: 1.5; }
-.town-map .mansion-gate-finial { fill: #c4aa77; stroke: #8f846b; stroke-width: 1; }
-.town-map .mansion-open-gate { fill: none; stroke: #4c655b; stroke-width: 1.8; stroke-linejoin: round; }
+.town-map .mansion-lawn {
+  fill: #b5ce92;
+  stroke: #8ea975;
+  stroke-width: 1.5;
+}
+.town-map .mansion-wall {
+  fill: none;
+  stroke: #c6b697;
+  stroke-width: 8;
+  stroke-linejoin: round;
+}
+.town-map .mansion-wall-cap {
+  fill: none;
+  stroke: #eee0c5;
+  stroke-width: 2;
+}
+.town-map .mansion-garden-path {
+  fill: none;
+  stroke: #e5ddbd;
+  stroke-width: 9;
+  stroke-linecap: round;
+}
+.town-map .mansion-driveway {
+  fill: none;
+  stroke: #b3b0a2;
+  stroke-width: 20;
+  stroke-linejoin: round;
+}
+.town-map .mansion-parking rect {
+  fill: #b3b0a2;
+  stroke: #f7edce;
+  stroke-width: 1.5;
+}
+.town-map .mansion-parking text {
+  fill: #f7edce;
+  font-size: 10px;
+  text-anchor: middle;
+  font-family: serif;
+}
+.town-map .mansion-flower-bed {
+  fill: #987b5d;
+  stroke: #719264;
+  stroke-width: 4;
+}
+.town-map .mansion-hedge {
+  fill: none;
+  stroke: #64875e;
+  stroke-width: 7;
+  stroke-linecap: round;
+}
+.town-map .mansion-facade,
+.town-map .mansion-dormer {
+  fill: #fff0d9;
+  stroke: #677065;
+  stroke-width: 2.2;
+}
+.town-map .mansion-wing {
+  fill: #ede1c9;
+  stroke: #677065;
+  stroke-width: 2;
+}
+.town-map .mansion-roof,
+.town-map .mansion-wing-roof {
+  fill: #587481;
+  stroke: #3d5864;
+  stroke-width: 2.5;
+  stroke-linejoin: round;
+}
+.town-map .mansion-roof-lines {
+  fill: none;
+  stroke: #91a6ad;
+  stroke-width: 1.3;
+}
+.town-map .mansion-dormer-roof {
+  fill: none;
+  stroke: #3d5864;
+  stroke-width: 3;
+  stroke-linejoin: round;
+}
+.town-map .mansion-window {
+  fill: #a7d3dc;
+  stroke: #758b8d;
+  stroke-width: 1.5;
+}
+.town-map .mansion-window-bars {
+  fill: none;
+  stroke: #fff9e9;
+  stroke-width: 1.5;
+}
+.town-map .mansion-floor-trim {
+  fill: none;
+  stroke: #d1c5a9;
+  stroke-width: 3;
+}
+.town-map .mansion-door {
+  fill: #48685b;
+  stroke: #38584c;
+  stroke-width: 2;
+}
+.town-map .mansion-door-trim {
+  fill: none;
+  stroke: #d4be91;
+  stroke-width: 2;
+}
+.town-map .mansion-porch-floor {
+  fill: #d9cbb1;
+  stroke: #8c8e7d;
+  stroke-width: 1.5;
+}
+.town-map .mansion-columns {
+  stroke: #fffaf0;
+  stroke-width: 5;
+}
+.town-map .mansion-portico {
+  fill: #eee0bf;
+  stroke: #8a8d78;
+  stroke-width: 2;
+}
+.town-map .mansion-portico-trim {
+  fill: none;
+  stroke: #b6a67f;
+  stroke-width: 1.5;
+}
+.town-map .mansion-balustrade {
+  fill: none;
+  stroke: #fff3da;
+  stroke-width: 2.5;
+}
+.town-map .mansion-gate-pillar {
+  fill: #e2d1b0;
+  stroke: #a19378;
+  stroke-width: 1.5;
+}
+.town-map .mansion-gate-finial {
+  fill: #c4aa77;
+  stroke: #8f846b;
+  stroke-width: 1;
+}
+.town-map .mansion-open-gate {
+  fill: none;
+  stroke: #4c655b;
+  stroke-width: 1.8;
+  stroke-linejoin: round;
+}
 
 /* A permanent compact header above a viewport-sized map. */
 .town-shell.town-shell {
@@ -1831,7 +2076,9 @@
   }
 }
 
-.town-shell .clock span { font-size: 0.9rem; }
+.town-shell .clock span {
+  font-size: 0.9rem;
+}
 
 .town-map .building-closed-sign rect {
   fill: #fff5df;
@@ -1854,36 +2101,202 @@
   transform: rotate(0deg);
   transition: transform 1s ease-in-out;
 }
-.town-map .mansion-gate.is-open .mansion-gate-left { transform: rotate(-88deg); }
-.town-map .mansion-gate.is-open .mansion-gate-right { transform: rotate(88deg); }
+.town-map .mansion-gate.is-open .mansion-gate-left {
+  transform: rotate(-88deg);
+}
+.town-map .mansion-gate.is-open .mansion-gate-right {
+  transform: rotate(88deg);
+}
 @media (prefers-reduced-motion: reduce) {
-  .town-map .mansion-gate-leaf { transition: none; }
+  .town-map .mansion-gate-leaf {
+    transition: none;
+  }
 }
 
 /* One shared cycle: sow the seed, water it, then reveal the sapling. */
-.town-map .planting-soil { fill: #ad8056; stroke: #73563f; stroke-width: 1.2; }
-.town-map .planting-arm { fill: none; stroke: #d39a72; stroke-width: 3; stroke-linecap: round; }
-.town-map .planting-trowel { fill: #bfc9c8; stroke: #596c68; stroke-width: 1.3; }
-.town-map .planting-seed { fill: #73563f; animation: planting-seed-fall 6s infinite; }
-.town-map .planting-sow { animation: planting-sow 6s infinite; transform-origin: 8px 0; }
-.town-map .planting-water { animation: planting-water 6s infinite; }
-.town-map .planting-can { fill: #7db8bb; stroke: #486d73; stroke-width: 1.5; transform-origin: 17px 7px; animation: planting-can-tip 6s infinite; }
-.town-map .planting-can-handle { fill: none; }
-.town-map .planting-water-drops { fill: none; stroke: #67b8d5; stroke-width: 2; stroke-linecap: round; animation: planting-water-fall 6s linear infinite; }
-.town-map .planting-stem { fill: none; stroke: #577f47; stroke-width: 2; }
-.town-map .planting-leaves { fill: #8abf6c; stroke: #577f47; stroke-width: 1.2; }
-.town-map .planting-sapling { transform-origin: 30px 23px; animation: planting-sprout 6s ease-in-out infinite; }
-.town-map .activity-plant .person-body { transform-origin: 0 15px; animation: planting-bend 6s ease-in-out infinite; }
-@keyframes planting-sow { 0%, 30% { opacity: 1; } 10%, 25% { transform: rotate(12deg); } 35%, 100% { opacity: 0; } }
-@keyframes planting-seed-fall { 0%, 12% { transform: translateY(0); opacity: 0; } 15% { opacity: 1; } 28% { transform: translateY(9px); opacity: 1; } 32%, 100% { transform: translateY(9px); opacity: 0; } }
-@keyframes planting-water { 0%, 32%, 90%, 100% { opacity: 0; } 38%, 83% { opacity: 1; } }
-@keyframes planting-can-tip { 0%, 32%, 90%, 100% { transform: rotate(0); } 42%, 78% { transform: rotate(18deg); } }
-@keyframes planting-water-fall { 0%, 42%, 80%, 100% { opacity: 0; transform: translateY(0); } 46%, 57%, 68% { opacity: 1; transform: translateY(0); } 54%, 65%, 76% { opacity: 0; transform: translateY(6px); } }
-@keyframes planting-sprout { 0%, 25% { opacity: 0; transform: scale(0.1); } 40% { opacity: 1; transform: scale(0.35); } 80%, 95% { opacity: 1; transform: scale(1); } 100% { opacity: 0; transform: scale(1); } }
-@keyframes planting-bend { 0%, 32% { transform: rotate(9deg) translateY(2px); } 40%, 85% { transform: rotate(3deg); } 95%, 100% { transform: rotate(0); } }
+.town-map .planting-soil {
+  fill: #ad8056;
+  stroke: #73563f;
+  stroke-width: 1.2;
+}
+.town-map .planting-arm {
+  fill: none;
+  stroke: #d39a72;
+  stroke-width: 3;
+  stroke-linecap: round;
+}
+.town-map .planting-trowel {
+  fill: #bfc9c8;
+  stroke: #596c68;
+  stroke-width: 1.3;
+}
+.town-map .planting-seed {
+  fill: #73563f;
+  animation: planting-seed-fall 6s infinite;
+}
+.town-map .planting-sow {
+  animation: planting-sow 6s infinite;
+  transform-origin: 8px 0;
+}
+.town-map .planting-water {
+  animation: planting-water 6s infinite;
+}
+.town-map .planting-can {
+  fill: #7db8bb;
+  stroke: #486d73;
+  stroke-width: 1.5;
+  transform-origin: 17px 7px;
+  animation: planting-can-tip 6s infinite;
+}
+.town-map .planting-can-handle {
+  fill: none;
+}
+.town-map .planting-water-drops {
+  fill: none;
+  stroke: #67b8d5;
+  stroke-width: 2;
+  stroke-linecap: round;
+  animation: planting-water-fall 6s linear infinite;
+}
+.town-map .planting-stem {
+  fill: none;
+  stroke: #577f47;
+  stroke-width: 2;
+}
+.town-map .planting-leaves {
+  fill: #8abf6c;
+  stroke: #577f47;
+  stroke-width: 1.2;
+}
+.town-map .planting-sapling {
+  transform-origin: 30px 23px;
+  animation: planting-sprout 6s ease-in-out infinite;
+}
+.town-map .activity-plant .person-body {
+  transform-origin: 0 15px;
+  animation: planting-bend 6s ease-in-out infinite;
+}
+@keyframes planting-sow {
+  0%,
+  30% {
+    opacity: 1;
+  }
+  10%,
+  25% {
+    transform: rotate(12deg);
+  }
+  35%,
+  100% {
+    opacity: 0;
+  }
+}
+@keyframes planting-seed-fall {
+  0%,
+  12% {
+    transform: translateY(0);
+    opacity: 0;
+  }
+  15% {
+    opacity: 1;
+  }
+  28% {
+    transform: translateY(9px);
+    opacity: 1;
+  }
+  32%,
+  100% {
+    transform: translateY(9px);
+    opacity: 0;
+  }
+}
+@keyframes planting-water {
+  0%,
+  32%,
+  90%,
+  100% {
+    opacity: 0;
+  }
+  38%,
+  83% {
+    opacity: 1;
+  }
+}
+@keyframes planting-can-tip {
+  0%,
+  32%,
+  90%,
+  100% {
+    transform: rotate(0);
+  }
+  42%,
+  78% {
+    transform: rotate(18deg);
+  }
+}
+@keyframes planting-water-fall {
+  0%,
+  42%,
+  80%,
+  100% {
+    opacity: 0;
+    transform: translateY(0);
+  }
+  46%,
+  57%,
+  68% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  54%,
+  65%,
+  76% {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+@keyframes planting-sprout {
+  0%,
+  25% {
+    opacity: 0;
+    transform: scale(0.1);
+  }
+  40% {
+    opacity: 1;
+    transform: scale(0.35);
+  }
+  80%,
+  95% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1);
+  }
+}
+@keyframes planting-bend {
+  0%,
+  32% {
+    transform: rotate(9deg) translateY(2px);
+  }
+  40%,
+  85% {
+    transform: rotate(3deg);
+  }
+  95%,
+  100% {
+    transform: rotate(0);
+  }
+}
 @media (prefers-reduced-motion: reduce) {
-  .town-map .planting-sow, .town-map .planting-seed { opacity: 0; }
-  .town-map .planting-water, .town-map .planting-sapling { opacity: 1; }
+  .town-map .planting-sow,
+  .town-map .planting-seed {
+    opacity: 0;
+  }
+  .town-map .planting-water,
+  .town-map .planting-sapling {
+    opacity: 1;
+  }
 }
 
 /* At overview scale these details are too small to read. Keep movement
@@ -1902,4 +2315,12 @@
 /* Bound decorative animation work in large cities even at close zoom. */
 .town-map.is-dense .map-entity:not(.is-selected):not(.activity-walk) * {
   animation-play-state: paused !important;
+}
+
+.town-map .map-tree {
+  cursor: pointer;
+}
+.town-map .map-tree:is(.is-selected, :focus-visible) {
+  filter: drop-shadow(0 0 3px #dca548);
+  outline: none;
 }

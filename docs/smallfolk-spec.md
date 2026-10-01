@@ -319,6 +319,8 @@ LOD changes must not produce impossible outcomes. Promote an entity before a vis
 
 The backend exposes semantic render state, not UI-specific sprite selection. The frontend maps semantic kinds, states, and variants to current assets/meshes/tiles. This makes a simple 2D renderer viable now and leaves 3D/isometric or alternate art styles possible later.
 
+Named residents have explicit hairstyle and clothing-silhouette designs keyed by resident ID, including the restaurant staff. These designs stay consistent across world seeds; colours and facial details retain deterministic variation. Lucas has cropped hair and trousers. Unrecognized resident IDs retain the generated appearance fallback.
+
 ```ts
 type RenderEntity = {
   id: string;
@@ -490,10 +492,14 @@ Town Hall shows treasury, reserved payments, daily/cumulative grants and support
 
 ### Town Hall staffing and municipal handymen
 
+Willow Library has Lea Moretti as librarian and Nora Klein as library assistant. Oak Clinic has Isabel Vega as doctor and Ana Silva as nurse. Former library staff Emma Romano and Ada Chen become a teaching assistant at SmallFolks School and a postal clerk at the post office; Oscar Lind moves from the clinic to Eastgate Workshop as a mechanic. New towns use these assignments, and existing saves receive a one-time staffing revision that preserves residents, homes, balances, needs, and positions.
+
 The small town keeps Sofia Costa and Eva Vega as planners; Maya Chen and Sara Lind are town handymen. Fresh towns use these roles, and existing snapshots convert only those two named residents when they are still planners employed by Town Hall. Migration preserves their positions, weekly schedules, balances, journeys, and existing volunteering projects; it does not add missing residents to older smaller towns.
 
 Handymen retain their normal weekday 08:00–17:00 public shifts and €12/hour wages, funded by the existing regional public-services budget. During shifts they walk from their actual position to on-site assignments instead of remaining at a planning desk. Priority is park cleanup when cleanliness is strictly below 50%, social work, then tree planting. A one-hour cleanup improves cleanliness by 40, capped at 100; accepted cleanup sessions finish even if cleanliness crosses the starting threshold. Dirtier available parks come first. Urgent park work interrupts lower-priority projects without erasing progress.
 
-Social work consists of one-hour companionship visits to awake residents who are actually at home and have unmet social need of at least 60; actual on-site companionship gradually reduces that need by up to 35 over an hour, and each recipient receives at most one completed municipal visit per day. A recipient leaving cancels the visit without fabricated progress. Handymen also provide one shared one-hour library-help session per day during scheduled opening hours. When these needs are served, they plant a visible tree after four accumulated on-site hours. Jobs, recipients, completion, and progress persist in `municipal_projects`; tree parcels and active work sites are reserved across municipal and voluntary work.
+Social work consists of one-hour companionship visits to awake residents who are actually at home and have unmet social need of at least 60; actual on-site companionship gradually reduces unmet social need and boredom for both the recipient and visiting handyman by up to 35 each over an hour, clamped at zero, and each recipient receives at most one completed municipal visit per day. A recipient leaving cancels the visit without fabricated progress. Handymen also provide one shared one-hour library-help session per day during scheduled opening hours. When these needs are served, they plant a visible tree after four accumulated on-site hours. Jobs, recipients, completion, and progress persist in `municipal_projects`; tree parcels and active work sites are reserved across municipal and voluntary work.
 
 Travel, waiting, meals, rest, and days off do not earn task wages or progress. Hunger of at least 65 triggers a meal break; lunchtime uses the usual hunger threshold of 35; urgent rest interrupts work at Town Hall. Task progress resumes after breaks and across shifts/saves. Municipal work pays only the normal public wage in 15-minute work blocks, with household sharing and earned-income history; it does not also pay a volunteering stipend. Town Hall displays the two handymen, their current activities, and recent municipal work separately from optional sponsored work.
+
+Trees are individually selectable, including existing scenery and home garden trees. Their details show age since planting on the simulation clock, the planting resident, and whether planting was volunteering work or paid municipal work. Planting history is saved with the tree and recovered from completed projects in older snapshots where possible; unrecorded dates and planters remain unknown.

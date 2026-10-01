@@ -55,6 +55,11 @@ def test_unemployed_resident_walks_plants_and_is_paid_once_after_four_hours():
     assert world["economy"]["treasury_cents"] == treasury
     assert world["economy"]["community_work_cents"] == escrow - 2400
     assert len(world["planted_trees"]) == 1
+    tree = world["planted_trees"][0]
+    assert tree["planted_at"] == project["completed_at"]
+    assert tree["planted_by_id"] == person["id"]
+    assert tree["planted_by_name"] == person["name"]
+    assert tree["planting_reason"] == "volunteering"
     assert not run_volunteering(
         *args, 15, 1080, True, _walk_from_current_position, _at_place
     )

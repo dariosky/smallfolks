@@ -159,12 +159,18 @@ def test_tree_progress_is_saved_and_preempted_by_urgent_cleanup_then_resumed():
     assert project["status"] == "completed"
     assert len(world["planted_trees"]) == 1
     assert world["planted_trees"][0]["id"] == project["id"]
+    tree = world["planted_trees"][0]
+    assert tree["planted_at"] == project["completed_at"]
+    assert tree["planted_by_id"] == person["id"]
+    assert tree["planted_by_name"] == person["name"]
+    assert tree["planting_reason"] == "town_employee"
 
 
-def test_companionship_precedes_library_and_planting_and_reduces_social_need():
+def test_companionship_precedes_library_and_planting_and_relaxes_both_residents():
     world, person, now = setup_world()
     recipient = next(p for p in world["people"] if p["id"] == "person:marta")
-    recipient["needs"]["social"] = 80
+    recipient["needs"].update(social=80, boredom=60)
+    person["needs"].update(social=50, boredom=20)
     home = next(p for p in world["places"] if p["id"] == recipient["home_place_id"])
     at(recipient, home)
     recipient["activity"] = "Reading at home"
@@ -178,15 +184,22 @@ def test_companionship_precedes_library_and_planting_and_reduces_social_need():
         run(world, person, now, 900)
     assert project["status"] == "completed"
     assert recipient["needs"]["social"] == 45
+    assert recipient["needs"]["boredom"] == 25
+    assert person["needs"]["social"] == 15
+    assert person["needs"]["boredom"] == 0
     assert recipient["municipal_visit_date"] == now.date().isoformat()
     run(world, person, now)
     assert own_project(world, person)["kind"] == "library_help"
+    assert recipient["needs"]["social"] == 45
+    assert recipient["needs"]["boredom"] == 25
+    assert person["needs"]["social"] == 15
 
 
 def test_social_visit_does_not_progress_when_recipient_leaves():
     world, person, now = setup_world()
     recipient = next(p for p in world["people"] if p["id"] == "person:marta")
-    recipient["needs"]["social"] = 80
+    recipient["needs"].update(social=80, boredom=60)
+    person["needs"].update(social=50, boredom=20)
     home = next(p for p in world["places"] if p["id"] == recipient["home_place_id"])
     at(recipient, home)
     recipient["activity"] = "Reading at home"
@@ -195,6 +208,9 @@ def test_social_visit_does_not_progress_when_recipient_leaves():
     at(person, home)
     run(world, person, now, 900)
     assert recipient["needs"]["social"] == 72
+    assert recipient["needs"]["boredom"] == 52
+    assert person["needs"]["social"] == 42
+    assert person["needs"]["boredom"] == 12
     world = json.loads(json.dumps(world))
     person = next(p for p in world["people"] if p["id"] == person["id"])
     recipient = next(p for p in world["people"] if p["id"] == recipient["id"])
@@ -204,6 +220,9 @@ def test_social_visit_does_not_progress_when_recipient_leaves():
     assert project["status"] == "cancelled"
     assert project["worked_seconds"] == 900
     assert recipient["needs"]["social"] == 72
+    assert recipient["needs"]["boredom"] == 52
+    assert person["needs"]["social"] == 42
+    assert person["needs"]["boredom"] == 12
 
 
 def test_library_help_is_daily_and_planting_is_the_fallback():

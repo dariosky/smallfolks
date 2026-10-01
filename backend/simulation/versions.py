@@ -10,7 +10,9 @@ from simulation.economy import ensure_economy
 from simulation.housing import ensure_home_parking
 from simulation.prosperity import ensure_prosperity
 from simulation.schedules import ensure_schedules
+from simulation.staffing import ensure_staffing
 from simulation.tick import STATIONS, rail_track
+from simulation.trees import ensure_trees
 
 WORLD_FORMAT_VERSION = 1
 LEGACY_WORLD_FORMAT_VERSION = 0
@@ -82,6 +84,7 @@ def migrate_snapshot(state: dict[str, Any]) -> dict[str, Any]:
                 if person.get("activity") == "Working as gardener" and person.get("target_place_id") == person.get("home_place_id"):
                     person["activity"] = "Tending the garden"
                     person["explanation"] = "Gardening at home is a hobby; paid gardening takes place at Fern Florist."
+    ensure_staffing(migrated)
     ensure_schedules(migrated)
     if migrated.get("generation_version") == "city-10":
         ensure_city_layout(migrated)
@@ -90,4 +93,5 @@ def migrate_snapshot(state: dict[str, Any]) -> dict[str, Any]:
     ensure_community(migrated)
     ensure_prosperity(migrated)
     update_building_status(migrated)
+    ensure_trees(migrated)
     return migrated

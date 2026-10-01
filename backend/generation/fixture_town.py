@@ -8,7 +8,9 @@ from simulation.economy import ensure_economy
 from simulation.housing import ensure_home_parking
 from simulation.prosperity import ensure_prosperity
 from simulation.schedules import ensure_schedules
+from simulation.staffing import ensure_staffing
 from simulation.tick import STATIONS, rail_track
+from simulation.trees import ensure_trees
 from simulation.versions import WORLD_FORMAT_VERSION
 
 GENERATION_VERSION = "city-10"
@@ -99,17 +101,17 @@ PEOPLE = [
 NEW_RESIDENTS = [
     ("alice", "Alice Romano", 11, "school", "Teacher", "teacher"),
     ("oliver", "Oliver Hart", 11, "school", "Teacher", "teacher"),
-    ("emma", "Emma Romano", 11, "library", "Library assistant", "student"),
+    ("emma", "Emma Romano", 11, "school", "Teaching assistant", "teacher"),
     ("leo", "Leo Hart", 11, "workshop", "Apprentice", "mechanic"),
-    ("isabel", "Isabel Vega", 12, "clinic", "Nurse", "nurse"),
+    ("isabel", "Isabel Vega", 12, "clinic", "Doctor", "doctor"),
     ("mateo", "Mateo Vega", 12, "post-office", "Postal clerk", "host"),
     ("eva", "Eva Vega", 12, "townhall", "Planner", "planner"),
     ("felix", "Felix Vega", 12, "school", "Teacher", "teacher"),
     ("maya", "Maya Chen", 13, "townhall", "Town handyman", "handyman"),
     ("noah", "Noah Chen", 13, "post-office", "Postal clerk", "host"),
-    ("ada", "Ada Chen", 13, "library", "Librarian", "librarian"),
+    ("ada", "Ada Chen", 13, "post-office", "Postal clerk", "host"),
     ("sara", "Sara Lind", 14, "townhall", "Town handyman", "handyman"),
-    ("oscar", "Oscar Lind", 14, "clinic", "Nurse", "nurse"),
+    ("oscar", "Oscar Lind", 14, "workshop", "Mechanic", "mechanic"),
     ("julia", "Julia Marin", 15, "post-office", "Postal clerk", "host"),
     ("sam", "Sam Wilson", 16, "workshop", "Carpenter", "carpenter"),
 ]
@@ -343,6 +345,7 @@ def build_fixture(seed: int) -> dict:
         "events": [],
     }
     world["map_size"] = {"width": 1200, "height": 1000}
+    ensure_staffing(world)
     ensure_schedules(world)
     validate_place_layout(world["places"])
     ensure_city_layout(world)
@@ -351,6 +354,7 @@ def build_fixture(seed: int) -> dict:
     ensure_community(world)
     ensure_prosperity(world)
     update_building_status(world)
+    ensure_trees(world)
     return world
 
 

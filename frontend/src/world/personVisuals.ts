@@ -90,6 +90,42 @@ const outfits = [
 ];
 const hairstyles: Appearance["hair"][] = ["crop", "sweep", "bob", "long", "bun"];
 
+// Authored character designs for the town's named cast, independent of world seed.
+const residentDesigns: Record<string, Pick<Appearance, "hair" | "skirt">> = {
+  "person:elena": { hair: "bun", skirt: false },
+  "person:marco": { hair: "crop", skirt: false },
+  "person:lea": { hair: "bob", skirt: true },
+  "person:tom": { hair: "sweep", skirt: false },
+  "person:ana": { hair: "bun", skirt: false },
+  "person:diego": { hair: "crop", skirt: false },
+  "person:sofia": { hair: "long", skirt: true },
+  "person:lucas": { hair: "crop", skirt: false },
+  "person:nora": { hair: "bob", skirt: false },
+  "person:bruno": { hair: "sweep", skirt: false },
+  "person:marta": { hair: "bun", skirt: false },
+  "person:hugo": { hair: "crop", skirt: false },
+  "person:irene": { hair: "long", skirt: true },
+  "person:paolo": { hair: "sweep", skirt: false },
+  "person:clara": { hair: "bob", skirt: true },
+  "person:alice": { hair: "bob", skirt: false },
+  "person:oliver": { hair: "sweep", skirt: false },
+  "person:emma": { hair: "long", skirt: false },
+  "person:leo": { hair: "crop", skirt: false },
+  "person:isabel": { hair: "bun", skirt: false },
+  "person:mateo": { hair: "sweep", skirt: false },
+  "person:eva": { hair: "bob", skirt: true },
+  "person:felix": { hair: "crop", skirt: false },
+  "person:maya": { hair: "bun", skirt: false },
+  "person:noah": { hair: "sweep", skirt: false },
+  "person:ada": { hair: "bob", skirt: false },
+  "person:sara": { hair: "bun", skirt: false },
+  "person:oscar": { hair: "crop", skirt: false },
+  "person:julia": { hair: "long", skirt: true },
+  "person:sam": { hair: "sweep", skirt: false },
+  "person:restaurant-lunch": { hair: "bun", skirt: false },
+  "person:restaurant-dinner": { hair: "crop", skirt: false },
+};
+
 function hash(value: string) {
   let result = 2166136261;
   for (const character of value) {
@@ -103,14 +139,15 @@ export function appearanceFor(personId: string, seed: number): Appearance {
   const base = `${seed}:${personId}`;
   const pick = (salt: string, length: number) => hash(`${base}:${salt}`) % length;
   const [outfit, outfitDark] = outfits[pick("outfit", outfits.length)];
+  const design = residentDesigns[personId];
   return {
-    hair: hairstyles[pick("hair", hairstyles.length)],
+    hair: design?.hair ?? hairstyles[pick("hair", hairstyles.length)],
     hairColor: hairColors[pick("hairColor", hairColors.length)],
     skinColor: skinColors[pick("skin", skinColors.length)],
     outfit,
     outfitDark,
     glasses: pick("glasses", 4) === 0,
     freckles: pick("freckles", 3) === 0,
-    skirt: pick("silhouette", 2) === 0,
+    skirt: design?.skirt ?? pick("silhouette", 2) === 0,
   };
 }

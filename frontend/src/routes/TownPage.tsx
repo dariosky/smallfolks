@@ -14,6 +14,7 @@ import {
   type Entity,
   type Place,
   type World,
+  type Tree,
 } from "../api/world";
 import {
   BankDetails,
@@ -24,9 +25,10 @@ import {
 import { TownMap } from "../world/TownMap";
 import { readMapCamera, saveMapCamera } from "../world/mapCamera";
 import { ShopPeople } from "../world/ShopPeople";
+import { TreeDetails } from "../world/TreeDetails";
 import { PersonName } from "../world/PersonName";
 
-type Selection = Entity | Place;
+type Selection = Entity | Place | Tree;
 
 function isEntity(selection: Selection): selection is Entity {
   return "activity" in selection || "state" in selection || "role" in selection;
@@ -187,12 +189,13 @@ export function TownPage() {
 
   const currentSelection =
     selected && world
-      ? ([...world.people, ...world.pets, ...world.vehicles, ...world.places].find(
+      ? ([...world.people, ...world.pets, ...world.vehicles, ...world.places, ...(world.planted_trees ?? []), ...(world.scenery_trees ?? [])].find(
           (item) => item.id === selected.id,
         ) ?? selected)
       : selected;
   const selectedEntity = currentSelection && isEntity(currentSelection) ? currentSelection : null;
-  const selectedPlace = currentSelection && !isEntity(currentSelection) ? currentSelection : null;
+  const selectedTree = currentSelection?.kind === "tree" ? currentSelection as Tree : null;
+  const selectedPlace = currentSelection && !isEntity(currentSelection) && !selectedTree ? currentSelection as Place : null;
   const trainState = world?.trains?.[0]?.state;
   const selectedStation =
     selectedPlace?.kind === "station"
@@ -313,7 +316,9 @@ export function TownPage() {
                   ("kind" in currentSelection ? labelsFor(currentSelection.kind) : "Place")}
               </p>
               <h2>{currentSelection.name}</h2>
-              {selectedEntity ? (
+              {selectedTree && world ? (
+                <TreeDetails tree={selectedTree} clock={world.clock} people={world.people} onSelect={setSelected} />
+              ) : selectedEntity ? (
                 <>
                   <p className="activity">{selectedEntity.activity ?? selectedEntity.state}</p>
                   {selectedEntity.employment_status === "out of work" ? (

@@ -3,6 +3,21 @@ import { activityKind, appearanceFor } from "./personVisuals";
 
 describe("resident visuals", () => {
   it.each([
+    "marco", "tom", "diego", "lucas", "bruno", "hugo", "paolo",
+    "oliver", "leo", "mateo", "felix", "noah", "oscar", "sam", "restaurant-dinner",
+  ])("keeps %s's authored short hairstyle and trousers across world seeds", (resident) => {
+    for (const seed of [42, 7341, 98765]) {
+      const appearance = appearanceFor(`person:${resident}`, seed);
+      expect(["crop", "sweep"]).toContain(appearance.hair);
+      expect(appearance.skirt).toBe(false);
+    }
+  });
+
+  it("gives Lucas a cropped hairstyle", () => {
+    expect(appearanceFor("person:lucas", 7341).hair).toBe("crop");
+  });
+
+  it.each([
     ["Sleeping at home", "sleep"],
     ["Reading at home", "read"],
     ["Tending the garden", "garden"],

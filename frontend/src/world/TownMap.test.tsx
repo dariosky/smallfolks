@@ -2,7 +2,7 @@ import { BuildingStatus } from "./BuildingStatus";
 import { act } from "react";
 import { createRoot } from "react-dom/client";
 import { renderToStaticMarkup } from "react-dom/server";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, afterEach, describe, expect, it, vi } from "vitest";
 import type { World } from "../api/world";
 import { BankDetails, HomeDevelopment, ResidentProsperity } from "./ProsperityDetails";
 import { TownMap } from "./TownMap";
@@ -394,4 +394,86 @@ it("culls off-camera sprites in a 500-resident city without losing the populatio
   expect(markup).toContain("500 neighbours");
   expect(markup).toContain("is-dense");
   expect(markup).not.toContain("Resident 499,");
+});
+
+describe("tree selection", () => {
+  beforeEach(() => {
+    Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
+    vi.stubGlobal(
+      "ResizeObserver",
+      class {
+        observe() {}
+        disconnect() {}
+      },
+    );
+  });
+  afterEach(() => vi.unstubAllGlobals());
+  it("selects planted and scenery trees by mouse and keyboard", async () => {
+    const planted = {
+      id: "tree:planted",
+      kind: "tree" as const,
+      name: "Town tree",
+      position: { x: 45, y: 65 },
+      planted_at: "2026-09-28T08:00:00",
+      planted_by_id: "person:reader",
+      planting_reason: "volunteering" as const,
+    };
+    const scenery = { ...planted, id: "tree:scenery:335:80", position: { x: 335, y: 80 } };
+    const onSelect = vi.fn();
+    const container = document.createElement("div");
+    document.body.append(container);
+    const root = createRoot(container);
+    try {
+      await act(async () =>
+        root.render(
+          <TownMap
+            world={{ ...world, planted_trees: [planted], scenery_trees: [scenery] }}
+            selectedId={planted.id}
+            onSelect={onSelect}
+          />,
+        ),
+      );
+      const buttons = container.querySelectorAll(".map-tree");
+      expect(buttons).toHaveLength(2);
+      expect(buttons[0].getAttribute("aria-pressed")).toBe("true");
+      await act(async () => buttons[0].dispatchEvent(new MouseEvent("click", { bubbles: true })));
+      expect(onSelect).toHaveBeenLastCalledWith(planted);
+      await act(async () =>
+        buttons[1].dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true })),
+      );
+      expect(onSelect).toHaveBeenLastCalledWith(scenery);
+    } finally {
+      await act(async () => root.unmount());
+      container.remove();
+    }
+  });
+
+  it("selects garden trees without selecting their house", async () => {
+    const onSelect = vi.fn();
+    const container = document.createElement("div");
+    const root = createRoot(container);
+    const home = {
+      id: "place:estate",
+      name: "Estate",
+      kind: "home",
+      position: { x: 400, y: 300 },
+      house_style: "mansion" as const,
+    };
+    try {
+      await act(async () =>
+        root.render(
+          <TownMap world={{ ...world, places: [home] }} selectedId={null} onSelect={onSelect} />,
+        ),
+      );
+      const buttons = container.querySelectorAll(".map-tree");
+      expect(buttons).toHaveLength(4);
+      await act(async () => buttons[0].dispatchEvent(new MouseEvent("click", { bubbles: true })));
+      expect(onSelect).toHaveBeenCalledTimes(1);
+      expect(onSelect).toHaveBeenCalledWith(
+        expect.objectContaining({ kind: "tree", id: "tree:place:estate:0" }),
+      );
+    } finally {
+      await act(async () => root.unmount());
+    }
+  });
 });

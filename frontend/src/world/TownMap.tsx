@@ -9,11 +9,12 @@ import {
   useState,
   type CSSProperties,
   type KeyboardEvent,
+  type ReactNode,
 } from "react";
 import "./sketch.css";
 import { MansionGate } from "./MansionGate";
 
-import type { ConstructionProject, Entity, Place, Train, World } from "../api/world";
+import type { ConstructionProject, Entity, Place, Train, Tree, World } from "../api/world";
 import {
   activityKind,
   activityLabels,
@@ -29,7 +30,7 @@ type Props = {
   onPositionChange?: (position: { x: number; y: number }) => void;
   world: World;
   selectedId: string | null;
-  onSelect: (entity: Entity | Place) => void;
+  onSelect: (entity: Entity | Place | Tree) => void;
 };
 
 function activate(event: KeyboardEvent<SVGGElement>, action: () => void) {
@@ -49,6 +50,10 @@ export function TownMap({
   onCameraChange,
 }: Props) {
   const pageVisible = usePageVisible();
+  const townTrees = useMemo(() => [
+    ...(world.planted_trees ?? []),
+    ...(world.scenery_trees ?? []).filter((tree) => tree.id.startsWith("tree:scenery:")),
+  ], [world.planted_trees, world.scenery_trees]);
   const townHour = Number(world.clock.slice(11, 13));
   const isNight = townHour >= 19 || townHour < 6;
   const svgRef = useRef<SVGSVGElement>(null);
@@ -338,6 +343,7 @@ export function TownMap({
           onSelect={onSelect}
           place={place}
           selected={place.id === selectedId}
+          selectedTreeId={selectedId}
           smokeActive={
             place.kind === "home"
               ? activeHomes.has(place.id)
@@ -346,7 +352,11 @@ export function TownMap({
           project={projectsById.get(place.construction_project_id ?? "")}
         />
       ))}
-      <TownTrees plantedTrees={world.planted_trees} />
+      <TownTrees
+        trees={townTrees}
+        selectedId={selectedId}
+        onSelect={onSelect}
+      />
       <CommunityWorkVisuals world={world} />
       <TownDetails />
       {(() => {
@@ -475,14 +485,28 @@ function TrainLoop({
                 </g>
               );
             })}
-            {entries.length ? <text className="station-queue-count" y={station.platform.y + station.platform.height + (horizontal ? 34 : 16)}>{entries.length} waiting</text> : null}
+            {entries.length ? (
+              <text
+                className="station-queue-count"
+                y={station.platform.y + station.platform.height + (horizontal ? 34 : 16)}
+              >
+                {entries.length} waiting
+              </text>
+            ) : null}
           </g>
         );
       })}
       <TrainCar
         distance={frontDistance}
         kind="locomotive"
-        onSelectTrain={() => onSelect({ id: train.id, kind: "train", name: train.name, position: railPosition(track, frontDistance) })}
+        onSelectTrain={() =>
+          onSelect({
+            id: train.id,
+            kind: "train",
+            name: train.name,
+            position: railPosition(track, frontDistance),
+          })
+        }
         track={track}
       />
       <TrainCar
@@ -561,7 +585,9 @@ function TrainCar({
           <rect className="train-coach" height="20" rx="5" width="40" x="-20" y="-10" />
           <rect className="train-windows train-skylight" height="14" rx="3" width="32" x="-16" y="-7" />
           <path className="train-roof-highlight" d="M-15-9h30M-15 9h30" />
-          {doorsOpen ? <rect className="train-open-door" x="-3" y="9" width="6" height="4" /> : null}
+          {doorsOpen ? (
+            <rect className="train-open-door" x="-3" y="9" width="6" height="4" />
+          ) : null}
           {passengers.map((passenger) => (
             <TrainPassenger
               key={passenger.id}
@@ -645,6 +671,7 @@ function Building({
   place,
   onSelect,
   selected,
+  selectedTreeId,
 }: {
   place: Place;
   smokeActive: boolean;
@@ -652,6 +679,7 @@ function Building({
   project?: ConstructionProject;
   onSelect: Props["onSelect"];
   selected: boolean;
+  selectedTreeId: string | null;
 }) {
   const { x, y } = place.position;
   const isHome = place.kind === "home";
@@ -686,7 +714,7 @@ function Building({
           <rect className="house-selection-ring" x={mansionHome ? -160 : estateHome ? -55 : largeHome ? -51 : -41} y={mansionHome ? -130 : estateHome ? -81 : largeHome ? -65 : -54} width={mansionHome ? 320 : estateHome ? 118 : largeHome ? 114 : 82} height={mansionHome ? 292 : estateHome ? 134 : largeHome ? 105 : 94} rx="8" />
         </g>
       )}
-      {estateHome && <EstateGarden />}
+      {estateHome && <EstateGarden place={place} world={world} onSelect={onSelect} selectedId={selectedTreeId} />}
       {place.driveway && !mansionHome && (
         <g className="home-driveway" aria-label="Side driveway with parking">
           <path className="driveway-paving" d={`M48 -12V${place.driveway.road_position.y - y}L${place.driveway.road_position.x - x} ${place.driveway.road_position.y - y}`} />
@@ -704,13 +732,21 @@ function Building({
           <path className="flower-bed" d="M-51-28h23m-19 5h15" />
         </>
       ) : mansionHome ? (
-        <Mansion place={place} world={world} />
+        <Mansion place={place} world={world} onSelect={onSelect} selectedId={selectedTreeId} />
       ) : estateHome ? (
         <EstateHome />
       ) : (
         <g className="illustrated-building">
           <ellipse className="house-shadow" cx="7" cy="30" rx={isHome ? 37 : 56} ry="9" />
-          <g transform={isHome ? (largeHome ? "translate(-8 -5) scale(1.12 1.15)" : undefined) : "scale(1.42 1.12)"}>
+          <g
+            transform={
+              isHome
+                ? largeHome
+                  ? "translate(-8 -5) scale(1.12 1.15)"
+                  : undefined
+                : "scale(1.42 1.12)"
+            }
+          >
             <path className="house-side" d="M28-11l10-10v43L28 31Z" />
             <path className="house-wall" d="M-30-13L28-12V31L-29 30Z" />
             <path className="house-roof-side" d="M-3-51 9-57 41-21 29-11Z" />
@@ -746,11 +782,19 @@ function Building({
         <path className="entrance-steps" aria-label="South-facing entrance" d="M-7 35h14m-14 5h14m-14 5h14" />
       )}
       {project && (
-        <g className="construction-site" aria-label={`House construction ${Math.round(project.worked_seconds / project.required_seconds * 100)}% complete`}>
-          <path className="construction-scaffold" d="M-39-48v84M31-48v84M-39-35h70M-39-10h70M-39 15h70M-39-35l70 50M31-35l-70 50" />
+        <g
+          className="construction-site"
+          aria-label={`House construction ${Math.round((project.worked_seconds / project.required_seconds) * 100)}% complete`}
+        >
+          <path
+            className="construction-scaffold"
+            d="M-39-48v84M31-48v84M-39-35h70M-39-10h70M-39 15h70M-39-35l70 50M31-35l-70 50"
+          />
           <path className="construction-barrier" d="M-40 40h68v9h-68z" />
           <path className="construction-stripes" d="m-35 40 9 9m6-9 9 9m6-9 9 9m6-9 9 9" />
-          <text className="construction-progress" x="-5" y="63">{Math.round(project.worked_seconds / project.required_seconds * 100)}%</text>
+          <text className="construction-progress" x="-5" y="63">
+            {Math.round((project.worked_seconds / project.required_seconds) * 100)}%
+          </text>
         </g>
       )}
       {place.operating_state && !place.operating_state.is_open && (
@@ -768,7 +812,17 @@ function Building({
   );
 }
 
-function Mansion({ place, world }: { place: Place; world: World }) {
+function Mansion({
+  place,
+  world,
+  onSelect,
+  selectedId,
+}: {
+  place: Place;
+  world: World;
+  onSelect: Props["onSelect"];
+  selectedId: string | null;
+}) {
   const roadY = (place.driveway?.road_position.y ?? place.position.y + 210) - place.position.y;
   return (
     <g className="mansion-estate" aria-label="Walled mansion with a vast garden and two parking spaces">
@@ -784,17 +838,39 @@ function Mansion({ place, world }: { place: Place; world: World }) {
       </g>
       <ellipse className="mansion-flower-bed" cx="-88" cy="109" rx="34" ry="11" />
       <ellipse className="mansion-flower-bed" cx="87" cy="-89" rx="25" ry="9" />
-      {[-112, -100, -88, -76, -64].map((x, index) => <circle key={x} className={index % 2 ? "estate-flower estate-flower-gold" : "estate-flower"} cx={x} cy="107" r="3" />)}
+      {[-112, -100, -88, -76, -64].map((x, index) => (
+        <circle
+          key={x}
+          className={index % 2 ? "estate-flower estate-flower-gold" : "estate-flower"}
+          cx={x}
+          cy="107"
+          r="3"
+        />
+      ))}
       <g className="mansion-fountain" transform="translate(-87 58)">
         <ellipse className="fountain-basin" rx="28" ry="18" />
         <ellipse className="fountain-water" cy="-2" rx="22" ry="13" />
         <path className="fountain-jet" d="M0-3V-32M0-21q-12-12-16 2M0-21q12-12 16 2" />
       </g>
-      {[[-123, -67], [123, -63], [-126, 130], [135, 133]].map(([x, y]) => (
-        <g key={`${x}:${y}`} transform={`translate(${x} ${y})`}>
+      {[
+        [-123, -67],
+        [123, -63],
+        [-126, 130],
+        [135, 133],
+      ].map(([x, y], index) => (
+        <TreeButton
+          key={`${x}:${y}`}
+          tree={gardenTree(world, place, index, x, y)}
+          selected={selectedId === `tree:${place.id}:${index}`}
+          onSelect={onSelect}
+          transform={`translate(${x} ${y})`}
+        >
           <path className="estate-tree-trunk" d="M0 7V-12" />
-          <path className="estate-tree-crown" d="M-11-5Q-23-13-13-22Q-16-37 0-39Q17-39 14-24Q27-13 12-5Z" />
-        </g>
+          <path
+            className="estate-tree-crown"
+            d="M-11-5Q-23-13-13-22Q-16-37 0-39Q17-39 14-24Q27-13 12-5Z"
+          />
+        </TreeButton>
       ))}
       <path className="mansion-hedge" d="M-143-108H-98M-143-22V24M144-20V18M-136 142H-44M44 142H112" />
       <g className="mansion-house">
@@ -826,7 +902,17 @@ function Mansion({ place, world }: { place: Place; world: World }) {
   );
 }
 
-function EstateGarden() {
+function EstateGarden({
+  place,
+  world,
+  onSelect,
+  selectedId,
+}: {
+  place: Place;
+  world: World;
+  onSelect: Props["onSelect"];
+  selectedId: string | null;
+}) {
   return (
     <g className="estate-garden" aria-label="Landscaped front garden" pointerEvents="none">
       <path className="estate-lawn" d="M-51-17Q-52-23-45-23H29V27H35V46H-50Z" />
@@ -839,8 +925,13 @@ function EstateGarden() {
           <circle className={index % 2 ? "estate-flower estate-flower-gold" : "estate-flower"} cy="-3" r="2.5" />
         </g>
       ))}
-      <path className="estate-tree-trunk" d="M-43 17V-1" />
-      <path className="estate-tree-crown" d="M-49 3Q-57-3-50-10Q-52-20-43-21Q-33-22-33-12Q-25-4-34 2Z" />
+      <TreeButton tree={gardenTree(world, place, 0, -43, 17)} selected={selectedId === `tree:${place.id}:0`} onSelect={onSelect}>
+        <path className="estate-tree-trunk" d="M-43 17V-1" />
+        <path
+          className="estate-tree-crown"
+          d="M-49 3Q-57-3-50-10Q-52-20-43-21Q-33-22-33-12Q-25-4-34 2Z"
+        />
+      </TreeButton>
     </g>
   );
 }
@@ -1073,7 +1164,9 @@ const EntitySprite = memo(function EntitySprite({
             carryingGroceries={entity.carrying_groceries === true}
             workStyle={workStyle}
           />
-          <ActivityBadge kind={activity} selected={selected} lift={badgeLift} />
+          {activity !== "walk" && (
+            <ActivityBadge kind={activity} selected={selected} lift={badgeLift} />
+          )}
         </>
       ) : entity.kind === "pet" ? (
         <PetSprite activity={activity} />
@@ -1333,10 +1426,13 @@ function workStyleFor(role?: string): WorkStyle {
     case "Carpenter":
       return "tools";
     case "Librarian":
+    case "Library assistant":
+    case "Teaching assistant":
     case "Teacher":
     case "Student":
       return "book";
     case "Nurse":
+    case "Doctor":
       return "care";
     case "Shopkeeper":
       return "shop";
@@ -1409,14 +1505,35 @@ function PetSprite({ activity }: { activity: ActivityKind }) {
     </g>
   );
 }
-function VehicleSprite({ sports, driver, heading, highlighted, onSelect }: { sports: boolean; driver?: Entity; heading: number; highlighted: boolean; onSelect: Props["onSelect"] }) {
+function VehicleSprite({
+  sports,
+  driver,
+  heading,
+  highlighted,
+  onSelect,
+}: {
+  sports: boolean;
+  driver?: Entity;
+  heading: number;
+  highlighted: boolean;
+  onSelect: Props["onSelect"];
+}) {
   const rotation = useContinuousHeading(heading);
   return (
     <g className={sports ? "vehicle-body sports-car-body" : "vehicle-body"} transform={`rotate(${rotation})`} style={{ transform: `rotate(${rotation}deg)` }}>
       {sports ? (
         <>
           <rect className="entity-hit vehicle-hit" x="-27" y="-14" width="54" height="28" rx="8" />
-          {highlighted && <rect className="vehicle-selection-ring" x="-27" y="-14" width="54" height="28" rx="8" />}
+          {highlighted && (
+            <rect
+              className="vehicle-selection-ring"
+              x="-27"
+              y="-14"
+              width="54"
+              height="28"
+              rx="8"
+            />
+          )}
           <ellipse className="vehicle-shadow" cx="1" cy="2" rx="26" ry="11" />
           <rect className="vehicle-wheel" x="-18" y="-12" width="9" height="5" rx="1" />
           <rect className="vehicle-wheel" x="11" y="-11" width="8" height="4" rx="1" />
@@ -1434,20 +1551,29 @@ function VehicleSprite({ sports, driver, heading, highlighted, onSelect }: { spo
         </>
       ) : (
         <>
-      <rect className="entity-hit vehicle-hit" x="-22" y="-14" width="44" height="28" rx="7" />
-      {highlighted && <rect className="vehicle-selection-ring" x="-22" y="-14" width="44" height="28" rx="7" />}
-      <ellipse className="vehicle-shadow" cx="1" cy="2" rx="20" ry="11" />
-      <rect className="vehicle-wheel" x="-14" y="-12" width="8" height="5" rx="1" />
-      <rect className="vehicle-wheel" x="8" y="-12" width="8" height="5" rx="1" />
-      <rect className="vehicle-wheel" x="-14" y="7" width="8" height="5" rx="1" />
-      <rect className="vehicle-wheel" x="8" y="7" width="8" height="5" rx="1" />
-      <path className="vehicle-shell" d="M-17-8Q-19-7-19-4v8q0 3 2 4h30q6 0 7-5V-3q-1-5-7-5Z" />
-      <rect className="vehicle-roof" x="-9" y="-6" width="18" height="12" rx="4" />
-      <path className="vehicle-windshield" d="M7-5q5 0 6 5-1 5-6 5Z" />
-      <path className="vehicle-rear-window" d="M-9-5q-4 1-5 5 1 4 5 5Z" />
-      <path className="vehicle-hood" d="M14-5v10" />
-      <path className="vehicle-lights" d="M17-6h2M17 6h2" />
-      <path className="vehicle-tail-lights" d="M-18-6h2M-18 6h2" />
+          <rect className="entity-hit vehicle-hit" x="-22" y="-14" width="44" height="28" rx="7" />
+          {highlighted && (
+            <rect
+              className="vehicle-selection-ring"
+              x="-22"
+              y="-14"
+              width="44"
+              height="28"
+              rx="7"
+            />
+          )}
+          <ellipse className="vehicle-shadow" cx="1" cy="2" rx="20" ry="11" />
+          <rect className="vehicle-wheel" x="-14" y="-12" width="8" height="5" rx="1" />
+          <rect className="vehicle-wheel" x="8" y="-12" width="8" height="5" rx="1" />
+          <rect className="vehicle-wheel" x="-14" y="7" width="8" height="5" rx="1" />
+          <rect className="vehicle-wheel" x="8" y="7" width="8" height="5" rx="1" />
+          <path className="vehicle-shell" d="M-17-8Q-19-7-19-4v8q0 3 2 4h30q6 0 7-5V-3q-1-5-7-5Z" />
+          <rect className="vehicle-roof" x="-9" y="-6" width="18" height="12" rx="4" />
+          <path className="vehicle-windshield" d="M7-5q5 0 6 5-1 5-6 5Z" />
+          <path className="vehicle-rear-window" d="M-9-5q-4 1-5 5 1 4 5 5Z" />
+          <path className="vehicle-hood" d="M14-5v10" />
+          <path className="vehicle-lights" d="M17-6h2M17 6h2" />
+          <path className="vehicle-tail-lights" d="M-18-6h2M-18 6h2" />
         </>
       )}
       {driver ? (
@@ -1469,33 +1595,86 @@ function VehicleSprite({ sports, driver, heading, highlighted, onSelect }: { spo
     </g>
   );
 }
-function TownTreesContent({ plantedTrees = [] }: { plantedTrees?: { position: { x: number; y: number } }[] }) {
+function gardenTree(world: World, place: Place, index: number, x: number, y: number): Tree {
+  const id = `tree:${place.id}:${index}`;
+  return (
+    world.scenery_trees?.find((tree) => tree.id === id) ?? {
+      id,
+      kind: "tree",
+      name: `Tree at ${place.name}`,
+      position: { x: place.position.x + x, y: place.position.y + y },
+      planting_reason: "existing_landscape",
+    }
+  );
+}
+
+function TreeButton({
+  tree,
+  onSelect,
+  selected = false,
+  transform,
+  children,
+}: {
+  tree: Tree;
+  onSelect: Props["onSelect"];
+  selected?: boolean;
+  transform?: string;
+  children: ReactNode;
+}) {
+  return (
+    <g
+      className={`map-tree ${selected ? "is-selected" : ""}`}
+      role="button"
+      tabIndex={0}
+      aria-label={`${tree.name}, ${tree.id}`}
+      aria-pressed={selected}
+      transform={transform}
+      pointerEvents="all"
+      onClick={(event) => {
+        event.stopPropagation();
+        onSelect(tree);
+      }}
+      onKeyDown={(event) => {
+        event.stopPropagation();
+        activate(event, () => onSelect(tree));
+      }}
+    >
+      <title>{tree.name}</title>
+      {children}
+    </g>
+  );
+}
+
+function TownTreesContent({
+  trees,
+  selectedId,
+  onSelect,
+}: {
+  trees: Tree[];
+  selectedId: string | null;
+  onSelect: Props["onSelect"];
+}) {
   return (
     <g className="trees">
-      {[
-        ...plantedTrees.map(({ position }) => [position.x, position.y]),
-        [45, 65],
-        [335, 80],
-        [330, 290],
-        [410, 130],
-        [445, 320],
-        [675, 180],
-        [755, 260],
-        [910, 120],
-        [1110, 410],
-        [920, 550],
-        [1090, 610],
-        [380, 610],
-      ].map(([x, y]) => (
-        <g key={`${x}-${y}`} transform={`translate(${x} ${y})`}>
-          <ellipse className="tree-shadow" cy="12" rx="20" ry="7" />
-          <path className="tree-trunk" d="M0 14V-15m0 16-9-9M0-4l8-9" />
-          <g className="tree-crown" style={{ animationDelay: `${-x / 100}s` }}>
-            <path d="M-16-6Q-26-19-13-26Q-12-42 2-37Q18-40 19-25Q31-17 18-6Q6 5-16-6Z" />
-            <path className="tree-pencil" d="M-13-20q1-9 9-8M8-25q8 0 7 7M-10-9q9 4 17-1" />
-          </g>
-        </g>
-      ))}
+      {trees.map((tree) => {
+        const { x, y } = tree.position;
+        return (
+          <TreeButton
+            key={tree.id}
+            tree={tree}
+            onSelect={onSelect}
+            selected={selectedId === tree.id}
+            transform={`translate(${x} ${y})`}
+          >
+            <ellipse className="tree-shadow" cy="12" rx="20" ry="7" />
+            <path className="tree-trunk" d="M0 14V-15m0 16-9-9M0-4l8-9" />
+            <g className="tree-crown" style={{ animationDelay: `${-x / 100}s` }}>
+              <path d="M-16-6Q-26-19-13-26Q-12-42 2-37Q18-40 19-25Q31-17 18-6Q6 5-16-6Z" />
+              <path className="tree-pencil" d="M-13-20q1-9 9-8M8-25q8 0 7 7M-10-9q9 4 17-1" />
+            </g>
+          </TreeButton>
+        );
+      })}
     </g>
   );
 }

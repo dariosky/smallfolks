@@ -7,6 +7,7 @@ from generation.validators import place_footprint
 from simulation.community import eligible_adult, ensure_community, pay_shared
 from simulation.economy import record_income, transfer
 from simulation.routing import nearest_road_point
+from simulation.trees import planting_record
 
 PLANTING_SECONDS = 4 * 60 * 60
 PLANTING_WAGE_CENTS = 2_400
@@ -302,7 +303,7 @@ def run_volunteering(
     project.update(status="completed", completed_at=now.isoformat(timespec="seconds"))
     if kind == "tree_planting":
         world.setdefault("planted_trees", []).append(
-            {"id": project["id"], "position": project["position"]}
+            planting_record(project, person, now, "volunteering")
         )
     elif kind == "community_gardening":
         world["community_gardens"].append(
